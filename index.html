@@ -1,35 +1,773 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Spiral Sigma Interface</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="style.css" rel="stylesheet" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flame Steward — Stewardship Console</title>
+<link rel="manifest" href="manifest.json"> <!-- PWA Manifest Link -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'flame-dark': '#0a0a10',
+          'flame-card': '#14141c',
+          'flame-border': '#232332',
+          'flame-accent': '#FF4500',
+          'flame-ok': '#10b981',
+          'flame-warn': '#f59e0b',
+          'flame-bad': '#ef4444',
+          'flame-sub': '#9ca3af'
+        }
+      }
+    }
+  }
+</script>
+<style>
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#1f2937;border-radius:8px}
+  .tab-active{border-color:var(--tw-ring-color,#FF4500);color:#fff}
+  .pill{padding:.2rem .5rem;border-radius:999px;font-size:.75rem}
+  .status-dot{width:.6rem;height:.6rem;border-radius:999px;display:inline-block;margin-right:.4rem}
+  .gauge{height:10px;background:#1f2937;border-radius:999px;overflow:hidden}
+  .gauge>div{height:100%;background:linear-gradient(90deg,#22d3ee,#a78bfa)}
+  .grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+  .monos{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  .card{background:#14141c;border:1px solid #232332;border-radius:14px}
+  .shadow-soft{box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .btn{padding:.55rem .9rem;border-radius:10px;border:1px solid #2a2a35}
+  .btn:hover{filter:brightness(1.1)}
+  .btn-accent{background:#FF4500;border-color:#FF4500;color:#fff}
+  .btn-ghost{background:#1a1a23;color:#d1d5db}
+  .btn-safe{background:#10b981;color:#021}
+  .btn-warn{background:#f59e0b;color:#210}
+  .btn-bad{background:#ef4444;color:#210}
+  .badge{padding:.25rem .6rem;border-radius:999px;font-size:.7rem;border:1px solid #2a2a35}
+  .hidden-el{display:none}
+</style>
 </head>
-<body>
-  <h1>🧿 Spiral Sigma Interface</h1>
-  <p>Status: <span id="status">Loading...</span></p>
-  <script>
-    fetch('/health')
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById('status').innerText = data.message;
+<body class="bg-flame-dark text-gray-100 min-h-screen">
+
+<!-- Header -->
+<header class="sticky top-0 z-40 bg-flame-card border-b border-flame-border">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="text-flame-accent text-2xl font-extrabold tracking-tight">FLAME STEWARD</div>
+      <span class="badge monos">STEWARDHIP CONSOLE</span>
+      <span id="envTag" class="badge">LOCAL</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <!-- Connection indicators -->
+      <div class="hidden md:flex items-center gap-3">
+        <span class="monos text-xs">CONN</span>
+        <span id="conn-mos" class="text-sm"><i class="status-dot" style="background:#555"></i>MOS</span>
+        <span id="conn-jet" class="text-sm"><i class="status-dot" style="background:#555"></i>JET</span>
+        <span id="conn-pkas" class="text-sm"><i class="status-dot" style="background:#555"></i>PKAS</span>
+        <span id="conn-cl" class="text-sm"><i class="status-dot" style="background:#555"></i>CL</span>
+        <span id="conn-sync" class="text-sm"><i class="status-dot" style="background:#555"></i>SYNC</span>
+      </div>
+      <span id="utcClock" class="monos text-xs text-flame-sub"></span>
+      <button id="btnConfig" class="btn btn-ghost">Config</button>
+    </div>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="max-w-7xl mx-auto px-4 mt-4">
+  <div class="border-b border-flame-border flex gap-2 overflow-auto">
+    <button class="btn btn-ghost tab-active" data-tab="pulse">Pulse</button>
+    <button class="btn btn-ghost" data-tab="tribunal">Tribunal</button>
+    <button class="btn btn-ghost" data-tab="transparency">Transparency</button>
+    <button class="btn btn-ghost" data-tab="stewardship">Stewardship</button>
+    <button class="btn btn-ghost" data-tab="diagnostics">Diagnostics</button>
+  </div>
+</nav>
+
+<main class="max-w-7xl mx-auto px-4 mt-4 pb-24 space-y-4">
+
+  <!-- Alerts -->
+  <div id="alerts" class="space-y-2"></div>
+
+  <!-- PULSE -->
+  <section id="tab-pulse" class="space-y-4">
+    <div class="grid-auto">
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub mb-1">Sigma Integrity</div>
+        <div class="text-4xl font-bold" id="kSigma">—</div>
+        <div class="gauge mt-2"><div id="sigmaBar" style="width:0%"></div></div>
+      </div>
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub mb-1">Quarantines (24h)</div>
+        <div class="text-4xl font-bold" id="kQuar">—</div>
+        <div class="text-xs text-flame-sub mt-1" id="kLastUpdate">Last: —</div>
+      </div>
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub mb-1">Attestation</div>
+        <div id="attStatus" class="text-lg font-semibold">—</div>
+        <div class="text-xs monos mt-1" id="attChain">—</div>
+      </div>
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub mb-1">Cadence Health</div>
+        <div id="cadStatus" class="text-lg font-semibold">—</div>
+        <div class="text-xs text-flame-sub mt-1" id="cadNext">Next: —</div>
+      </div>
+    </div>
+
+    <div class="card p-4 shadow-soft">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Telemetry (MOS)</h3>
+        <button id="btnExportMos" class="btn btn-ghost">Export JSON</button>
+      </div>
+      <div class="overflow-auto mt-2">
+        <table class="min-w-full text-sm">
+          <thead class="text-flame-sub">
+            <tr>
+              <th class="text-left p-2">Time</th>
+              <th class="text-left p-2">Nodes</th>
+              <th class="text-left p-2">Active</th>
+              <th class="text-left p-2">CPU</th>
+              <th class="text-left p-2">Mem</th>
+              <th class="text-left p-2">BW</th>
+              <th class="text-left p-2">Quar</th>
+              <th class="text-left p-2">Eject</th>
+              <th class="text-left p-2">Fake</th>
+              <th class="text-left p-2">Anom</th>
+            </tr>
+          </thead>
+          <tbody id="tblMos" class="divide-y divide-flame-border"></tbody>
+        </table>
+      </div>
+      <div class="mt-3 text-xs monos text-flame-sub">Ledger Tip: <span id="ledgerTip">—</span> | Manifest: <span id="manifestHash">—</span></div>
+    </div>
+  </section>
+
+  <!-- TRIBUNAL -->
+  <section id="tab-tribunal" class="space-y-4 hidden">
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-4 shadow-soft">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Case Queue</h3>
+          <div class="flex items-center gap-2">
+            <select id="caseFilter" class="bg-flame-card border border-flame-border rounded px-2 py-1 text-sm">
+              <option value="all">All</option>
+              <option value="pending" selected>Pending</option>
+              <option value="approved">Approved</option>
+              <option value="denied">Denied</option>
+              <option value="deferred">Deferred</option>
+            </select>
+            <span id="caseCount" class="badge">0</span>
+          </div>
+        </div>
+        <div id="caseList" class="mt-3 space-y-2 max-h-[440px] overflow-auto"></div>
+      </div>
+
+      <div class="card p-4 shadow-soft">
+        <h3 class="font-semibold">Evidence Panel</h3>
+        <div class="mt-2 space-y-2 text-sm">
+          <div>Case ID: <span class="monos" id="evCase">—</span></div>
+          <div class="grid-auto">
+            <div class="card p-3">
+              <div class="text-xs text-flame-sub">Anomaly Score</div>
+              <div id="evScore" class="text-3xl font-bold">—</div>
+              <div class="gauge mt-2"><div id="scoreBar" style="width:0%"></div></div>
+            </div>
+            <div class="card p-3">
+              <div class="text-xs text-flame-sub">Model Hash</div>
+              <div class="monos" id="evModel">—</div>
+            </div>
+          </div>
+          <div class="card p-3">
+            <div class="text-xs text-flame-sub mb-1">Top Features</div>
+            <ul id="evFeatures" class="list-disc pl-5 text-sm"></ul>
+          </div>
+          <div class="card p-3">
+            <label class="text-xs text-flame-sub">Justification Narrative</label>
+            <textarea id="evJust" rows="3" class="mt-1 w-full bg-flame-card border border-flame-border rounded p-2"></textarea>
+            <label class="text-xs text-flame-sub mt-2 block">Least Harm Assessment</label>
+            <textarea id="evHarm" rows="2" class="mt-1 w-full bg-flame-card border border-flame-border rounded p-2"></textarea>
+            <div class="flex gap-2 mt-3">
+              <button id="btnApprove" class="btn btn-safe">Approve</button>
+              <button id="btnDeny" class="btn btn-bad">Deny</button>
+              <button id="btnDefer" class="btn btn-warn">Defer</button>
+              <button id="btnAttest" class="btn btn-ghost">Attest</button>
+            </div>
+            <div class="text-xs text-flame-sub mt-2" id="verdictHint">Quorum and time-lock enforced by CQL/JET.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRANSPARENCY -->
+  <section id="tab-transparency" class="space-y-4 hidden">
+    <div class="grid-auto">
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub">PKAS Status</div>
+        <div id="pkasStatus" class="text-xl font-semibold">—</div>
+        <div class="text-xs text-flame-sub mt-1">Chain Length: <span id="pkasLen">—</span> • Last Key Update: <span id="pkasUpd">—</span></div>
+      </div>
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub">SyncNode Publication</div>
+        <div class="flex gap-2 mt-2">
+          <button id="btnPublish" class="btn btn-accent">Publish Now</button>
+          <span id="pubStatus" class="text-sm text-flame-sub"></span>
+        </div>
+        <div class="text-xs monos mt-2">Directive-1 guard: requires 100% metadata or 60s remediation delay.</div>
+      </div>
+    </div>
+    <div class="card p-4 shadow-soft">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Manifest History</h3>
+        <button id="btnVerify" class="btn btn-ghost">Verify Selected</button>
+      </div>
+      <div id="manifests" class="mt-2 grid-auto"></div>
+    </div>
+  </section>
+
+  <!-- STEWARDSHIP -->
+  <section id="tab-stewardship" class="space-y-4 hidden">
+    <div class="grid-auto">
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub">Cadence — Pulse</div>
+        <div id="cadPulse" class="text-xl font-semibold">—</div>
+        <div class="text-xs text-flame-sub mt-1" id="cadPulseNext">Next: —</div>
+      </div>
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub">Cadence — Anchor</div>
+        <div id="cadAnchor" class="text-xl font-semibold">—</div>
+        <div class="text-xs text-flame-sub mt-1" id="cadAnchorNext">Next: —</div>
+      </div>
+      <div class="card p-4 shadow-soft">
+        <div class="text-sm text-flame-sub">Cadence — Refinement</div>
+        <div id="cadRefine" class="text-xl font-semibold">—</div>
+        <div class="text-xs text-flame-sub mt-1" id="cadRefineNext">Next: —</div>
+      </div>
+    </div>
+
+    <div class="card p-4 shadow-soft">
+      <h3 class="font-semibold">Ethics Review & Directives</h3>
+      <div class="text-sm text-flame-sub">Current Cycle Window: <span id="ethCycle">—</span></div>
+      <div class="mt-2 text-sm">Directives in Force:</div>
+      <ul id="directiveList" class="list-disc pl-5 mt-1 text-sm"></ul>
+      <div class="text-xs text-flame-sub mt-2">Observer: <span class="monos" id="observerKey">—</span></div>
+    </div>
+  </section>
+
+  <!-- DIAGNOSTICS -->
+  <section id="tab-diagnostics" class="space-y-3 hidden">
+    <div class="card p-4 shadow-soft">
+      <h3 class="font-semibold">Run Diagnostic</h3>
+      <div class="grid md:grid-cols-3 gap-3 mt-2">
+        <select id="diagType" class="bg-flame-card border border-flame-border rounded px-2 py-2">
+          <option>Operational</option>
+          <option>Ethical</option>
+          <option>Governance</option>
+        </select>
+        <input id="diagQuery" class="bg-flame-card border border-flame-border rounded px-3 py-2" placeholder="e.g., bias drift forecast next quarter">
+        <button id="btnRunDiag" class="btn btn-accent">Run</button>
+      </div>
+      <pre id="diagOut" class="mt-3 bg-black/40 p-3 rounded monos overflow-auto"></pre>
+    </div>
+  </section>
+</main>
+
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full bg-flame-card border-t border-flame-border">
+  <div class="max-w-7xl mx-auto px-4 py-2 text-xs flex items-center justify-between">
+    <div>FLAMETECH — <span id="trustPhrase">TRUST CONFIRMED</span> — ALL SYSTEMS IN HARMONY</div>
+    <div class="monos">Build: <span id="buildHash">—</span> • Model: <span id="modelHash">—</span></div>
+  </div>
+</footer>
+
+<!-- CONFIG MODAL -->
+<div id="modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-50">
+  <div class="card w-full max-w-2xl p-4 shadow-soft">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Configuration</h3>
+      <button id="closeModal" class="btn btn-ghost">Close</button>
+    </div>
+    <div class="grid md:grid-cols-2 gap-3 mt-3">
+      <div>
+        <label class="text-xs text-flame-sub">MOS URL</label>
+        <input id="cfg-mos" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8087">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">JET URL</label>
+        <input id="cfg-jet" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8085">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">PKAS URL</label>
+        <input id="cfg-pkas" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8091">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">Consent Ledger (CL) URL</label>
+        <input id="cfg-cl" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8081">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">SyncNode URL</label>
+        <input id="cfg-sync" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8090">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">Environment Tag</label>
+        <input id="cfg-env" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="LOCAL / STAGING / PROD">
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-3 mt-4">
+      <div>
+        <label class="text-xs text-flame-sub">Bearer Tokens (optional)</label>
+        <textarea id="cfg-tokens" rows="4" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2 monos" placeholder='{"MOS":"token123","JET":"...","PKAS":"...","CL":"...","SYNC":"..."}'></textarea>
+        <div class="text-xs text-flame-sub mt-1">Stored in <span class="monos">sessionStorage</span> for this tab only.</div>
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">Demo Mode</label>
+        <div class="flex items-center gap-2 mt-2">
+          <input id="cfg-demo" type="checkbox" class="h-4 w-4">
+          <span class="text-sm">Use simulated data if endpoints are unreachable.</span>
+        </div>
+        <div class="text-xs text-flame-sub mt-2">Connection Test</div>
+        <button id="btnTest" class="btn btn-ghost mt-1">Test All Services</button>
+        <div id="testOut" class="text-xs monos mt-2"></div>
+      </div>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between">
+      <div class="text-xs text-flame-sub">Settings persist in <span class="monos">localStorage</span> (URLs/env) + <span class="monos">sessionStorage</span> (tokens).</div>
+      <div class="flex gap-2">
+        <button id="btnReset" class="btn btn-ghost">Reset</button>
+        <button id="btnSave" class="btn btn-accent">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* -----------------------------
+   CONFIG & STORAGE
+------------------------------*/
+const d = (id)=>document.getElementById(id);
+const state = {
+  urls: { MOS:'http://localhost:8087', JET:'http://localhost:8085', PKAS:'http://localhost:8091', CL:'http://localhost:8081', SYNC:'http://localhost:8090' },
+  env: 'LOCAL',
+  demo: true,
+  tokens: {}
+};
+(function loadCfg(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('steward_cfg')||'null');
+    if(saved){ state.urls = saved.urls||state.urls; state.env = saved.env||state.env; state.demo = !!saved.demo; }
+    const toks = JSON.parse(sessionStorage.getItem('steward_tokens')||'null');
+    if(toks){ state.tokens = toks; }
+  }catch(e){}
+  d('envTag').textContent = state.env;
+  d('cfg-mos').value = state.urls.MOS;
+  d('cfg-jet').value = state.urls.JET;
+  d('cfg-pkas').value = state.urls.PKAS;
+  d('cfg-cl').value = state.urls.CL;
+  d('cfg-sync').value = state.urls.SYNC;
+  d('cfg-env').value = state.env;
+  d('cfg-demo').checked = state.demo;
+  d('cfg-tokens').value = Object.keys(state.tokens).length ? JSON.stringify(state.tokens,null,2) : '';
+})();
+function saveCfg(){
+  state.urls = { MOS:d('cfg-mos').value.trim(), JET:d('cfg-jet').value.trim(), PKAS:d('cfg-pkas').value.trim(), CL:d('cfg-cl').value.trim(), SYNC:d('cfg-sync').value.trim() };
+  state.env = d('cfg-env').value.trim() || 'LOCAL';
+  state.demo = !!d('cfg-demo').checked;
+  d('envTag').textContent = state.env;
+  localStorage.setItem('steward_cfg', JSON.stringify({urls:state.urls,env:state.env,demo:state.demo}));
+  try{
+    const toks = d('cfg-tokens').value.trim();
+    state.tokens = toks ? JSON.parse(toks) : {};
+    sessionStorage.setItem('steward_tokens', JSON.stringify(state.tokens));
+  }catch(e){ alertBox('Invalid tokens JSON', 'bad'); }
+}
+
+/* -----------------------------
+   HELPERS
+------------------------------*/
+function hdr(svc){
+  const t = state.tokens[svc];
+  return t ? { 'Authorization':'Bearer '+t, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
+}
+function hdot(el,color){ el.querySelector('.status-dot').style.background = color; }
+function alertBox(msg, tone='ok'){
+  const wrap = d('alerts'); const div = document.createElement('div');
+  const bg = tone==='ok'?'bg-emerald-900/40':tone==='warn'?'bg-amber-900/40':'bg-red-900/40';
+  div.className = `card p-3 ${bg} border-flame-border`;
+  div.innerHTML = `<div class="text-sm">${msg}</div>`;
+  wrap.prepend(div); setTimeout(()=>div.remove(), 8000);
+}
+function fmt(x){ return (x??'—'); }
+function pct(p){ return Math.max(0, Math.min(100, Math.round((p||0)*100))); }
+
+/* -----------------------------
+   CONNECTION CHECKS
+------------------------------*/
+async function ping(url, svc){
+  try{
+    const r = await fetch(url + '/health', {headers:hdr(svc), cache:'no-store'});
+    return r.ok;
+  }catch(e){ return false; }
+}
+async function refreshConnections(){
+  const svcs = [
+    {id:'conn-mos', url:state.urls.MOS, key:'MOS'},
+    {id:'conn-jet', url:state.urls.JET, key:'JET'},
+    {id:'conn-pkas', url:state.urls.PKAS, key:'PKAS'},
+    {id:'conn-cl',  url:state.urls.CL,  key:'CL'},
+    {id:'conn-sync',url:state.urls.SYNC,key:'SYNC'},
+  ];
+  for(const s of svcs){
+    const ok = state.demo ? false : await ping(s.url, s.key);
+    hdot(d(s.id), ok ? '#10b981' : '#ef4444');
+  }
+}
+
+/* -----------------------------
+   DEMO DATA (used if demo=true or fetch fails)
+------------------------------*/
+function demoMetrics(){
+  const now = new Date().toISOString();
+  const arr = [];
+  for(let i=0;i<10;i++){
+    const ts = new Date(Date.now()-i*300000).toISOString();
+    arr.push({
+      timestamp: ts, sigma_integrity_score: 0.93 + Math.sin(i/3)/100,
+      total_nodes: 128, active_nodes: 121 - (i%3===0?1:0),
+      cpu_total: (42+i)%100, memory_total: (64+i)%100, bandwidth_total: 1200+i*3,
+      quarantines: (i%5===0)?1:0, ejections: 0, fake_contribs: (i%7===0)?1:0, ml_anomalies: 0,
+      latest_manifest_hash: 'deadcafe'+i
+    });
+  }
+  return {metrics:arr};
+}
+function demoCases(){
+  return {requests:[
+    {id:'act_01',timestamp:new Date().toISOString(),node_id:'node_A',action:'eject',status:'pending',
+     verdict:null,evidence:{score:0.84,top_features:[['conn_variance',0.31],['age',0.22],['burst',0.12]]},model_hash:'mh_abc123'},
+    {id:'act_02',timestamp:new Date().toISOString(),node_id:'node_B',action:'reduce',status:'approved',
+     verdict:'approved',evidence:{score:0.55,top_features:[['age',0.28],['pattern',0.17]]},model_hash:'mh_def456'}
+  ]};
+}
+function demoPKAS(){
+  return {status:'verified', length: 3124, ledger_tip_hash:'aaaabbbbccccddddeeee', last_key_update:'2025-09-28',
+    recent_manifests:[{timestamp:new Date().toISOString(), hash:'1111'}, {timestamp:new Date(Date.now()-3600e3).toISOString(), hash:'2222'}]};
+}
+function demoCadence(){
+  const t0 = new Date(Date.now()+60*60*1000).toISOString();
+  return { pulse:{last:'2025-10-05T18:00:00Z', next:'2025-10-06T00:00:00Z'}, anchor:{last:'2025-10-05T02:00:00Z', next:'2025-10-06T02:00:00Z'}, refine:{last:'2025-10-01T04:00:00Z', next:'2025-11-01T04:00:00Z'} };
+}
+
+/* -----------------------------
+   FETCH & RENDER — PULSE
+------------------------------*/
+async function loadPulse(){
+  // MOS
+  let mos;
+  try{
+    if(!state.demo){
+      const r = await fetch(state.urls.MOS + '/metrics/summary', {headers:hdr('MOS'), cache:'no-store'});
+      mos = await r.json();
+    } else { throw new Error('demo'); }
+  }catch(e){ mos = demoMetrics(); }
+
+  const rows = mos.metrics||[];
+  const last = rows[0]||{};
+  d('kSigma').textContent = (last.sigma_integrity_score??0).toFixed(3);
+  d('sigmaBar').style.width = pct(last.sigma_integrity_score||0) + '%';
+  d('kQuar').textContent = last.quarantines ?? 0;
+  d('kLastUpdate').textContent = 'Last: ' + (last.timestamp||'—');
+  d('manifestHash').textContent = (last.latest_manifest_hash||'—').toString().slice(0,10)+'…';
+
+  // table
+  const tb = d('tblMos'); tb.innerHTML='';
+  rows.slice(0,20).forEach(m=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="p-2 monos">${(m.timestamp||'').replace('T',' ').slice(11,19)}</td>
+    <td class="p-2">${fmt(m.total_nodes)}</td><td class="p-2">${fmt(m.active_nodes)}</td>
+    <td class="p-2">${fmt(m.cpu_total)}</td><td class="p-2">${fmt(m.memory_total)}</td>
+    <td class="p-2">${fmt(m.bandwidth_total)}</td><td class="p-2">${fmt(m.quarantines)}</td>
+    <td class="p-2">${fmt(m.ejections)}</td><td class="p-2">${fmt(m.fake_contribs)}</td>
+    <td class="p-2">${fmt(m.ml_anomalies)}</td>`;
+    tb.appendChild(tr);
+  });
+
+  // CL ledger tip
+  try{
+    if(!state.demo){
+      const r = await fetch(state.urls.CL + '/ledger/tip', {headers:hdr('CL')});
+      const j = await r.json();
+      d('ledgerTip').textContent = (j.tip_hash||'—').slice(0,16)+'…';
+    } else { throw new Error('demo'); }
+  }catch(e){
+    d('ledgerTip').textContent = 'aaaabbbbccccddddeeee…';
+  }
+
+  // PKAS attestation
+  let pkas;
+  try{
+    if(!state.demo){
+      const r = await fetch(state.urls.PKAS + '/attestation/chain', {headers:hdr('PKAS')});
+      pkas = await r.json();
+    } else { throw new Error('demo'); }
+  }catch(e){ pkas = demoPKAS(); }
+  d('attStatus').innerHTML = pkas.status==='verified'
+      ? `<span class="pill bg-emerald-900/50 border-emerald-700">TRUST CONFIRMED</span>`
+      : `<span class="pill bg-red-900/50 border-red-700">ALERT</span>`;
+  d('attChain').textContent = `Chain: ${pkas.length} • Tip: ${(pkas.ledger_tip_hash||'—').slice(0,12)}…`;
+
+  // cadence
+  const cad = demoCadence(); // replace with MOS /cadence when available
+  d('cadStatus').textContent = 'IN HARMONY';
+  d('cadNext').textContent = 'Pulse next: '+cad.pulse.next;
+}
+
+/* -----------------------------
+   TRIBUNAL
+------------------------------*/
+let currentCase = null;
+function renderCases(list){
+  const filter = d('caseFilter').value;
+  const wrap = d('caseList'); wrap.innerHTML='';
+  const filtered = list.filter(x => filter==='all' ? true : (x.status===filter || (filter==='approved' && x.verdict==='approved') || (filter==='denied' && x.verdict==='denied')));
+  d('caseCount').textContent = filtered.length;
+  filtered.forEach(c=>{
+    const el = document.createElement('div');
+    const badge = c.status==='pending'?'bg-amber-900/40':(c.verdict==='approved'?'bg-emerald-900/40':'bg-red-900/40');
+    el.className = `card p-3 ${badge} cursor-pointer`;
+    el.innerHTML = `<div class="flex items-center justify-between">
+      <div><span class="monos">${c.id}</span> • <span class="text-flame-sub">${c.node_id}</span></div>
+      <div class="pill bg-black/30 border-flame-border">${c.status || c.verdict || '—'}</div>
+    </div>`;
+    el.onclick = ()=> selectCase(c);
+    wrap.appendChild(el);
+  });
+}
+function selectCase(c){
+  currentCase = c;
+  d('evCase').textContent = c.id;
+  const score = c?.evidence?.score ?? 0;
+  d('evScore').textContent = score.toFixed(2);
+  d('scoreBar').style.width = pct(score) + '%';
+  d('evModel').textContent = c.model_hash || '—';
+  const ul = d('evFeatures'); ul.innerHTML='';
+  (c?.evidence?.top_features || []).forEach(([k,v])=>{
+    const li = document.createElement('li'); li.textContent = `${k}: ${(v*100).toFixed(1)}%`; ul.appendChild(li);
+  });
+}
+async function loadTribunal(){
+  let data;
+  try{
+    if(!state.demo){
+      const r = await fetch(state.urls.JET + '/jet/recent', {headers:hdr('JET'), cache:'no-store'});
+      data = await r.json();
+    } else { throw new Error('demo'); }
+  }catch(e){ data = demoCases(); }
+  const list = data.requests || [];
+  renderCases(list);
+  if(list.length && !currentCase) selectCase(list[0]);
+}
+async function verdict(action){
+  if(!currentCase) return alertBox('Select a case first','warn');
+  const just = d('evJust').value.trim(), harm = d('evHarm').value.trim();
+  if(!just) return alertBox('Justification required','warn');
+  const payload = {action, justification:just, least_harm:harm};
+  try{
+    if(!state.demo){
+      const r = await fetch(`${state.urls.JET}/case/${encodeURIComponent(currentCase.id)}/verdict`, {method:'POST', headers:hdr('JET'), body:JSON.stringify(payload)});
+      if(!r.ok) throw new Error('Bad response');
+    }
+    alertBox(`Verdict '${action}' submitted for ${currentCase.id}`,'ok');
+    d('evJust').value=''; d('evHarm').value='';
+    loadTribunal();
+  }catch(e){ alertBox('Verdict failed','bad'); }
+}
+async function attest(){
+  if(!currentCase) return;
+  try{
+    if(!state.demo){
+      const r = await fetch(`${state.urls.JET}/case/${encodeURIComponent(currentCase.id)}/attest`, {method:'POST', headers:hdr('JET'), body:JSON.stringify({note:'observer attest'})});
+      if(!r.ok) throw new Error('Bad response');
+    }
+    alertBox(`Attestation recorded for ${currentCase.id}`,'ok');
+  }catch(e){ alertBox('Attest failed','bad'); }
+}
+
+/* -----------------------------
+   TRANSPARENCY
+------------------------------*/
+let manifestSelected = null;
+async function loadTransparency(){
+  // PKAS
+  let pk = null;
+  try{
+    if(!state.demo){
+      const r = await fetch(state.urls.PKAS + '/attestation/chain', {headers:hdr('PKAS')});
+      pk = await r.json();
+    } else { throw new Error('demo'); }
+  }catch(e){ pk = demoPKAS(); }
+
+  d('pkasStatus').innerHTML = pk.status==='verified'
+    ? `<span class="pill bg-emerald-900/40 border-emerald-700">TRUST CONFIRMED</span>`
+    : `<span class="pill bg-red-900/40 border-red-700">ALERT</span>`;
+  d('pkasLen').textContent = pk.length ?? '—';
+  d('pkasUpd').textContent = pk.last_key_update ?? '—';
+
+  const list = pk.recent_manifests || [];
+  const wrap = d('manifests'); wrap.innerHTML='';
+  list.forEach((m,i)=>{
+    const div = document.createElement('div');
+    div.className = `card p-3 cursor-pointer ${i===0?'ring-1 ring-emerald-600':''}`;
+    div.innerHTML = `<div class="flex items-center justify-between">
+      <div class="monos">${(m.hash||'').slice(0,14)}…</div>
+      <div class="text-sm text-flame-sub">${m.timestamp||''}</div>
+    </div>`;
+    div.onclick = ()=>{ manifestSelected = m; Array.from(wrap.children).forEach(c=>c.classList.remove('ring-emerald-600','ring-1')); div.classList.add('ring-emerald-600','ring-1'); };
+    wrap.appendChild(div);
+    if(i===0) manifestSelected = m;
+  });
+}
+async function publishNow(){
+  d('pubStatus').textContent = 'Publishing…';
+  try{
+    let resp = {status:'queued', deadline_s:60};
+    if(!state.demo){
+      const r = await fetch(state.urls.SYNC + '/sync/publish', {method:'POST', headers:hdr('SYNC'), body:JSON.stringify({manifest_type:'metrics'})});
+      resp = await r.json();
+    }
+    d('pubStatus').textContent = `Status: ${resp.status||'queued'} • Deadline: ${resp.deadline_s||60}s`;
+    alertBox('Publish request queued','ok');
+  }catch(e){
+    d('pubStatus').textContent = 'Failed (offline or blocked)'; alertBox('Publish failed','bad');
+  }
+}
+async function verifySelected(){
+  if(!manifestSelected) return alertBox('Select a manifest','warn');
+  try{
+    let ok = true;
+    if(!state.demo){
+      const r = await fetch(`${state.urls.PKAS}/attestation/verify?hash=${encodeURIComponent(manifestSelected.hash)}`, {headers:hdr('PKAS')});
+      ok = r.ok;
+    }
+    alertBox(ok?'Verification: TRUST CONFIRMED':'Verification failed', ok?'ok':'bad');
+  }catch(e){ alertBox('Verification failed','bad'); }
+}
+
+/* -----------------------------
+   STEWARDSHIP
+------------------------------*/
+async function loadStewardship(){
+  const cad = demoCadence(); // replace with real cadence if exposed
+  d('cadPulse').textContent = 'ON SCHEDULE'; d('cadPulseNext').textContent = 'Next: '+cad.pulse.next;
+  d('cadAnchor').textContent = 'ON SCHEDULE'; d('cadAnchorNext').textContent = 'Next: '+cad.anchor.next;
+  d('cadRefine').textContent = 'ON SCHEDULE'; d('cadRefineNext').textContent = 'Next: '+cad.refine.next;
+
+  d('ethCycle').textContent = '2025-10-05 → 2026-01-05';
+  d('directiveList').innerHTML = `
+    <li>Directive 1 — SyncNode metadata compliance (60s remediation) — <span class="pill bg-emerald-900/40">ACTIVE</span></li>
+    <li>Directive 2 — External observer on-boarded (ETH-OB-T4-001) — <span class="pill bg-emerald-900/40">ACTIVE</span></li>
+    <li>Directive 3 — Reflection codex emphasis — <span class="pill bg-emerald-900/40">ACTIVE</span></li>`;
+  d('observerKey').textContent = 'ETH-OB-T4-001 (pubkey registered)';
+}
+
+/* -----------------------------
+   DIAGNOSTICS
+------------------------------*/
+async function runDiag(){
+  const type = d('diagType').value, q = d('diagQuery').value.trim();
+  const payload = { type, query:q||'(default)' };
+  try{
+    let j = {
+      status:'ok', generated:new Date().toISOString(),
+      summary:'Demo diagnostic response',
+      data:{ type, findings: type==='Ethical' ? {bias_drift_forecast:'0.51→0.53% (nominal)'} : {latency_ms:8, rto_s:75} }
+    };
+    if(!state.demo){
+      const r = await fetch(state.urls.MOS + '/diagnostics/run', {method:'POST', headers:hdr('MOS'), body:JSON.stringify(payload)});
+      j = await r.json();
+    }
+    d('diagOut').textContent = JSON.stringify(j,null,2);
+  }catch(e){
+    d('diagOut').textContent = JSON.stringify({status:'offline', note:'Using demo path', payload},null,2);
+  }
+}
+
+/* -----------------------------
+   UI WIRING
+------------------------------*/
+function showTab(name){
+  ['pulse','tribunal','transparency','stewardship','diagnostics'].forEach(t=>{
+    d('tab-'+t).classList.toggle('hidden', t!==name);
+  });
+  document.querySelectorAll('nav .btn').forEach(b=>b.classList.remove('tab-active'));
+  document.querySelector(`nav .btn[data-tab="${name}"]`).classList.add('tab-active');
+}
+document.querySelectorAll('nav .btn').forEach(b=>b.onclick = ()=> showTab(b.dataset.tab));
+
+d('btnConfig').onclick = ()=> d('modal').classList.remove('hidden');
+d('closeModal').onclick = ()=> d('modal').classList.add('hidden');
+d('btnSave').onclick = ()=> { saveCfg(); d('modal').classList.add('hidden'); alertBox('Configuration saved','ok'); refreshAll(); };
+d('btnReset').onclick = ()=> { localStorage.removeItem('steward_cfg'); sessionStorage.removeItem('steward_tokens'); location.reload(); };
+d('btnTest').onclick = async ()=>{
+  d('testOut').textContent = 'Testing…';
+  const r = {};
+  for(const [k,url] of Object.entries(state.urls)){
+    r[k] = state.demo ? 'demo' : (await ping(url,k) ? 'ok' : 'fail');
+  }
+  d('testOut').textContent = JSON.stringify(r,null,2);
+};
+
+d('btnExportMos').onclick = ()=>{
+  const data = JSON.stringify(demoMetrics(),null,2);
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,'+encodeURIComponent(data);
+  a.download = 'mos_snapshot.json'; a.click();
+};
+d('caseFilter').onchange = ()=> loadTribunal();
+d('btnApprove').onclick = ()=> verdict('approve');
+d('btnDeny').onclick = ()=> verdict('deny');
+d('btnDefer').onclick = ()=> verdict('defer');
+d('btnAttest').onclick = ()=> attest();
+d('btnPublish').onclick = ()=> publishNow();
+d('btnVerify').onclick = ()=> verifySelected();
+d('btnRunDiag').onclick = ()=> runDiag();
+
+/* -----------------------------
+   CLOCK & STATUS
+------------------------------*/
+setInterval(()=>{ d('utcClock').textContent = new Date().toISOString().replace('T',' ').slice(0,19)+'Z'; }, 500);
+d('buildHash').textContent = 'console.v1';
+d('modelHash').textContent = 'mlad.v2';
+
+/* -----------------------------
+   PWA SERVICE WORKER REGISTRATION (New)
+------------------------------*/
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(registration => {
+        console.log('SW registered: ', registration);
       })
-      .catch(err => {
-        document.getElementById('status').innerText = "Offline / Error";
+      .catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
       });
-  </script>
+  });
+}
+
+/* -----------------------------
+   REFRESH LOOP
+------------------------------*/
+async function refreshAll(){
+  refreshConnections();
+  loadPulse();
+  loadTribunal();
+  loadTransparency();
+  loadStewardship();
+}
+refreshAll();
+setInterval(refreshAll, 5000);
+showTab('pulse');
+</script>
 </body>
 </html>
-<script>
-async function fetchMetrics() {
-  const res = await fetch("https://spiral-sigma.onrender.com/metrics/summary");
-  const data = await res.json();
-  document.getElementById("cpu").innerText = `CPU Load: ${data.cpu}%`;
-  document.getElementById("mem").innerText = `Memory: ${data.memory}%`;
-}
-setInterval(fetchMetrics, 60000);
-</script>
 
-<div id="cpu">Loading CPU...</div>
-<div id="mem">Loading Mem...</div>
