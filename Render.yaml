@@ -1,27 +1,12 @@
 services:
   - type: web
-    name: flame-relay-backend
+    name: spiral-sigma
     env: python
-    plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python App.py"
+    startCommand: "python server.py"
+    autoDeploy: true
     envVars:
       - key: FLASK_ENV
-        value: development
-      - key: NODE_ID
-        value: SIGMA-GRD
-      - key: JUSTICE_SECRET
-        value: "replace-with-long-random-secret"
-      - key: SERVICE_TOKENS_JSON
-        value: "{}"
-      - key: MOS_URL
-        value: ""
-      - key: JET_URL
-        value: ""
-      - key: PKAS_URL
-        value: ""
-      - key: CL_URL
-        value: ""
-      - key: SYNC_URL
-        value: ""
-    autoDeploy: true
+        value: production
+      - key: PORT
+        value: 10000
