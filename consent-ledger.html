@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consent Ledger (CL)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Custom Tailwind Config for SIGMA Theme
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'flame-dark': '#0a0a10',
+                        'flame-card': '#14141c',
+                        'flame-border': '#232332',
+                        'flame-accent': '#FF4500',
+                        'flame-ok': '#10b981',
+                        'flame-warn': '#f59e0b',
+                        'flame-bad': '#ef4444',
+                        'flame-sub': '#9ca3af'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0a0a10; color: #ffffff; font-family: sans-serif; }
+        .card { background-color: #14141c; border: 1px solid #232332; border-radius: 14px; }
+        .monos { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; }
+        .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #232332; }
+        th { color: #FF4500; font-size: 0.8rem; text-transform: uppercase; }
+        .tag-consent { background-color: #10b981; color: #0a0a10; }
+        .tag-data { background-color: #22d3ee; color: #0a0a10; }
+        .tag { padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="border-b-2 border-flame-accent pb-4">
+            <h1 class="text-3xl font-bold text-flame-accent">Consent Ledger (CL)</h1>
+        </header>
+
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="card p-5 col-span-2 lg:col-span-1">
+                <div class="text-sm text-flame-sub mb-1">Current Block Height</div>
+                <div class="text-4xl font-bold monos" id="blockHeight">1,890,211</div>
+            </div>
+            <div class="card p-5 lg:col-span-2">
+                <div class="text-sm text-flame-sub mb-1">Latest Consensus Hash (SHA-256)</div>
+                <div class="text-lg font-bold monos break-all text-flame-ok" id="latestHash">6f9d2a3e1c8b9d0e7f4a5b6c7d8e9f381c8b9d0e7f4a5b6c7d8e9f381c8b9d0e</div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">Ledger Log (/consent/log)</h2>
+            
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <select id="filterType" class="p-2 bg-flame-dark border border-flame-border rounded text-sm">
+                    <option value="all">Filter: All Events</option>
+                    <option value="consent">Filter: Identity/Consent</option>
+                    <option value="data">Filter: Data/Metric</option>
+                </select>
+                <input type="text" id="searchHash" class="p-2 bg-flame-dark border border-flame-border rounded text-sm flex-grow" placeholder="Search by Hash or User ID...">
+            </div>
+
+            <div class="max-h-96 overflow-y-auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Hash Segment</th>
+                            <th>Event Type</th>
+                            <th>Source ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTable">
+                        <!-- Log entries injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const LOGS = [
+            { time: '21:05:40Z', hash: '5a3b9d0e...', type: 'CONSENT', source: 'ETH-OB-T4-001' },
+            { time: '20:41:22Z', hash: '8c4e5f6d...', type: 'DATA', source: 'MOS-SUMMARY' },
+            { time: '20:37:01Z', hash: '1e2f3a4b...', type: 'DATA', source: 'SYNC-MANIFEST' },
+            { time: '19:55:01Z', hash: '9b0c1d2e...', type: 'CONSENT', source: 'CUSTODIAN-LKO' },
+            { time: '19:12:44Z', hash: '4f5e6d7c...', type: 'DATA', source: 'PKAS-KEY' },
+        ];
+        
+        function renderTable() {
+            const table = d('logTable');
+            const filter = d('filterType').value;
+            table.innerHTML = '';
+            
+            const filteredLogs = LOGS.filter(log => filter === 'all' || log.type.toLowerCase() === filter);
+
+            filteredLogs.forEach(log => {
+                const tr = table.insertRow();
+                const typeClass = log.type === 'CONSENT' ? 'tag-consent' : 'tag-data';
+                tr.innerHTML = `
+                    <td><span class="monos text-sm">${log.time}</span></td>
+                    <td><span class="monos text-xs">${log.hash}</span></td>
+                    <td><span class="tag ${typeClass}">${log.type}</span></td>
+                    <td><span class="text-sm text-flame-sub">${log.source}</span></td>
+                `;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTable();
+            d('filterType').addEventListener('change', renderTable);
+            
+            // Simulate hash rotation every 30s
+            setInterval(() => {
+                d('blockHeight').textContent = (parseInt(d('blockHeight').textContent.replace(/,/g, '')) + 1).toLocaleString();
+                d('latestHash').textContent = Math.random().toString(16).substring(2, 34) + Math.random().toString(16).substring(2, 34);
+                // Simulate new log entry
+                if (Math.random() > 0.7) {
+                    LOGS.unshift({ time: new Date().toISOString().slice(11, 19) + 'Z', hash: Math.random().toString(16).substring(2, 10) + '...', type: Math.random() > 0.5 ? 'DATA' : 'CONSENT', source: 'AUTO-PULSE' });
+                    if (LOGS.length > 10) LOGS.pop(); 
+                    renderTable();
+                }
+            }, 3000);
+        });
+        
+        function d(id) { return document.getElementById(id); }
+    </script>
+</body>
+</html>
+

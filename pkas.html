@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Key Attestation System (PKAS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Custom Tailwind Config for SIGMA Theme
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'flame-dark': '#0a0a10',
+                        'flame-card': '#14141c',
+                        'flame-border': '#232332',
+                        'flame-accent': '#FF4500',
+                        'flame-ok': '#10b981',
+                        'flame-warn': '#f59e0b',
+                        'flame-bad': '#ef4444',
+                        'flame-sub': '#9ca3af'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0a0a10; color: #ffffff; font-family: sans-serif; }
+        .card { background-color: #14141c; border: 1px solid #232332; border-radius: 14px; }
+        .monos { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; }
+        .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; }
+        .status-verified { background-color: #10b981; color: #0a0a10; }
+        .status-alert { background-color: #ef4444; color: #ffffff; }
+        .tag { padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="border-b-2 border-flame-accent pb-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-flame-accent">Public Key Attestation System (PKAS)</h1>
+            <div id="chainStatus" class="text-lg font-semibold text-flame-ok">CHAIN VERIFIED</div>
+        </header>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="card p-5 col-span-2">
+                <div class="text-sm text-flame-sub mb-1">Current Chain Length</div>
+                <div class="text-4xl font-bold monos" id="chainLength">31,902</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">New Submissions (1h)</div>
+                <div class="text-4xl font-bold monos" id="newSubmissions">4</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">Last Key Rotation</div>
+                <div class="text-xl font-bold monos" id="lastRotation">2025-09-28</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="card p-6 lg:col-span-2">
+                <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">Attested Keys Ledger</h2>
+                <div id="keyList" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Keys injected here -->
+                </div>
+            </div>
+
+            <div class="card p-6">
+                <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">Submit New Key</h2>
+                <div class="space-y-3">
+                    <input type="text" id="keyIdentifier" class="w-full p-2 bg-flame-dark border border-flame-border rounded text-sm" placeholder="Identifier (e.g., NODE-ALPHA-07)">
+                    <textarea id="publicKey" rows="6" class="w-full p-2 bg-flame-dark border border-flame-border rounded text-sm monos" placeholder="Paste Public Key PEM or Fingerprint"></textarea>
+                    <button onclick="submitKey()" class="btn w-full bg-flame-accent text-white hover:bg-[#cc3a00]">Attest & Register</button>
+                    <div id="submissionMessage" class="text-xs text-flame-sub pt-2">Simulated POST to /pkas/register</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let keys = [
+            { id: 'CUSTODIAN-LKO', status: 'VERIFIED' },
+            { id: 'ETH-OB-T4-001', status: 'VERIFIED' },
+            { id: 'NODE-GAMMA-03', status: 'ALERT' },
+            { id: 'SERVICE-JET-01', status: 'VERIFIED' },
+        ];
+        
+        function renderKeys() {
+            const list = d('keyList');
+            list.innerHTML = '';
+            keys.forEach(k => {
+                const el = document.createElement('div');
+                const tagClass = k.status === 'VERIFIED' ? 'status-verified' : 'status-alert';
+                el.className = 'p-3 card flex justify-between items-center';
+                el.innerHTML = `
+                    <span class="monos text-gray-200">${k.id}</span>
+                    <span class="tag ${tagClass}">${k.status}</span>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        function submitKey() {
+            const id = d('keyIdentifier').value.trim();
+            const key = d('publicKey').value.trim();
+            
+            if (!id || !key) {
+                alert('Both Identifier and Key content are required.');
+                return;
+            }
+
+            // Simulate immediate POST success
+            d('submissionMessage').textContent = `POST to /pkas/register successful. ${id} is PENDING verification.`;
+            d('submissionMessage').style.color = '#f59e0b';
+            
+            keys.push({ id: id, status: 'PENDING' });
+            d('chainLength').textContent = (parseInt(d('chainLength').textContent.replace(/,/g, '')) + 1).toLocaleString();
+            d('newSubmissions').textContent = parseInt(d('newSubmissions').textContent) + 1;
+            d('keyIdentifier').value = '';
+            d('publicKey').value = '';
+            renderKeys();
+        }
+
+        document.addEventListener('DOMContentLoaded', renderKeys);
+        
+        function d(id) { return document.getElementById(id); }
+    </script>
+</body>
+</html>
+

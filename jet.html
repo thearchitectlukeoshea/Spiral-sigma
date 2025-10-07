@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Judgment Execution (JET)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Custom Tailwind Config for SIGMA Theme
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'flame-dark': '#0a0a10',
+                        'flame-card': '#14141c',
+                        'flame-border': '#232332',
+                        'flame-accent': '#FF4500',
+                        'flame-ok': '#10b981',
+                        'flame-warn': '#f59e0b',
+                        'flame-bad': '#ef4444',
+                        'flame-sub': '#9ca3af'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0a0a10; color: #ffffff; font-family: sans-serif; }
+        .card { background-color: #14141c; border: 1px solid #232332; border-radius: 14px; }
+        .monos { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; }
+        .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; }
+        .tag-pending { background-color: #f59e0b; color: #0a0a10; }
+        .tag-approved { background-color: #10b981; color: #0a0a10; }
+        .tag-rejected { background-color: #ef4444; color: #ffffff; }
+        .tag { padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="border-b-2 border-flame-accent pb-4">
+            <h1 class="text-3xl font-bold text-flame-accent">Judgment Execution Tracker (JET)</h1>
+        </header>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">Queue Depth (Pending)</div>
+                <div class="text-4xl font-bold monos text-flame-warn" id="queueDepth">5</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">Avg. Verdict Latency</div>
+                <div class="text-4xl font-bold monos" id="avgLatency">125ms</div>
+            </div>
+            <div class="card p-5 col-span-2">
+                <div class="text-sm text-flame-sub mb-1">Consensus Timeline (Last 5h)</div>
+                <div class="h-4 bg-flame-dark rounded-full overflow-hidden mt-2">
+                    <div class="h-full bg-flame-ok" style="width: 80%; float: left;"></div>
+                    <div class="h-full bg-flame-bad" style="width: 10%; float: left;"></div>
+                    <div class="h-full bg-flame-warn" style="width: 10%; float: left;"></div>
+                </div>
+                <div class="text-xs text-flame-sub mt-1 flex justify-between"><span>Approved (80%)</span><span>Rejected/Deferred (20%)</span></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="card p-6 lg:col-span-2">
+                <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">Pending Case Queue (/jet/log)</h2>
+                <div id="caseQueue" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Cases injected here -->
+                </div>
+            </div>
+
+            <div class="card p-6">
+                <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">Custodian Verdict</h2>
+                <div class="space-y-3">
+                    <div class="text-lg monos text-flame-accent" id="activeCaseId">CASE: J-1024-A</div>
+                    <textarea id="justification" rows="4" class="w-full p-2 bg-flame-dark border border-flame-border rounded text-sm" placeholder="Justification Narrative (Mandatory)"></textarea>
+                    <div class="flex flex-col space-y-2">
+                        <button onclick="submitVerdict('Approved')" class="btn bg-flame-ok text-flame-dark hover:bg-[#0d9472]">Approve & Execute</button>
+                        <button onclick="submitVerdict('Deferred')" class="btn bg-flame-warn text-flame-dark hover:bg-[#c27c00]">Defer for Review</button>
+                        <button onclick="submitVerdict('Rejected')" class="btn bg-flame-bad text-white hover:bg-[#cc3a3a]">Reject & Eject</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cases = [
+            { id: 'J-1024-A', node: 'NODE-GAMMA-01', action: 'EJECT', score: 0.91, status: 'PENDING' },
+            { id: 'J-1023-B', node: 'NODE-BETA-05', action: 'THROTTLE', score: 0.65, status: 'PENDING' },
+            { id: 'J-1022-C', node: 'SYNC-RELAY-03', action: 'REPORT', score: 0.51, status: 'PENDING' },
+            { id: 'J-1021-D', node: 'CUSTODIAN-LKO', action: 'UPDATE', score: 0.22, status: 'PENDING' },
+        ];
+        
+        function renderQueue() {
+            const queue = d('caseQueue');
+            queue.innerHTML = '';
+            cases.forEach(c => {
+                const el = document.createElement('div');
+                el.className = 'p-3 card flex justify-between items-center hover:border-flame-accent/50 cursor-pointer';
+                el.innerHTML = `
+                    <div>
+                        <span class="monos text-gray-200">${c.id}</span>
+                        <span class="text-xs text-flame-sub ml-3">Node: ${c.node}</span>
+                    </div>
+                    <div>
+                        <span class="tag tag-pending">${c.action}</span>
+                        <span class="ml-2 text-sm font-semibold" style="color:${c.score > 0.8 ? '#10b981' : '#f59e0b'};">${c.score.toFixed(2)}</span>
+                    </div>
+                `;
+                queue.appendChild(el);
+            });
+            d('queueDepth').textContent = cases.length;
+        }
+
+        function submitVerdict(verdict) {
+            const justification = d('justification').value.trim();
+            if (!justification) {
+                alert('Justification Narrative is mandatory before execution.');
+                return;
+            }
+
+            const caseId = d('activeCaseId').textContent;
+            
+            // Simulate POST /jet/verdict/J-1024-A with payload
+            alert(`Simulating POST for ${caseId}...\nVerdict: ${verdict}\nJustification: ${justification.substring(0, 30)}...`);
+            
+            // Simulation logic to remove case
+            cases.shift();
+            d('justification').value = '';
+            
+            if (cases.length > 0) {
+                d('activeCaseId').textContent = `CASE: ${cases[0].id}`;
+            } else {
+                d('activeCaseId').textContent = 'QUEUE EMPTY';
+            }
+
+            renderQueue();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderQueue();
+            setInterval(() => {
+                d('avgLatency').textContent = `${(100 + Math.floor(Math.random() * 50))}ms`;
+            }, 5000);
+        });
+        
+        function d(id) { return document.getElementById(id); }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metrics & Observability (MOS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Custom Tailwind Config for SIGMA Theme
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'flame-dark': '#0a0a10',
+                        'flame-card': '#14141c',
+                        'flame-border': '#232332',
+                        'flame-accent': '#FF4500',
+                        'flame-ok': '#10b981',
+                        'flame-warn': '#f59e0b',
+                        'flame-bad': '#ef4444',
+                        'flame-sub': '#9ca3af'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0a0a10; color: #ffffff; font-family: sans-serif; }
+        .card { background-color: #14141c; border: 1px solid #232332; border-radius: 14px; }
+        .monos { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; }
+        .pulse-dot {
+            width: 1rem; height: 1rem; border-radius: 50%; display: inline-block; margin-right: 0.5rem;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-green 1.5s infinite;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="border-b-2 border-flame-accent pb-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-flame-accent">Metrics & Observability (MOS)</h1>
+            <div id="statusIndicator" class="flex items-center text-flame-ok">
+                <span class="pulse-dot bg-flame-ok"></span><span class="text-sm sm:text-base">LIVE FEED</span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">Sigma Integrity Score</div>
+                <div class="text-4xl font-bold monos text-flame-ok" id="integrityScore">0.992</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">CPU Load (%)</div>
+                <div class="text-4xl font-bold monos text-flame-warn" id="cpuLoad">45.8%</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">Active Nodes</div>
+                <div class="text-4xl font-bold monos" id="activeNodes">128/130</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-sm text-flame-sub mb-1">Quarantines (24h)</div>
+                <div class="text-4xl font-bold monos text-flame-bad" id="quarantines">3</div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">Telemetry Logs (/mos/logs)</h2>
+            <pre id="logOutput" class="monos overflow-x-auto text-xs p-3 bg-flame-dark rounded-lg h-64"></pre>
+        </div>
+    </div>
+
+    <script>
+        const LOGS = [
+            "[20:39:12Z] Pulse: Integrity check passed. Drift: 0.008.",
+            "[20:38:55Z] Node 7F3B reported high CPU (92%). Throttling active.",
+            "[20:37:40Z] Anchor: Nightly backup initiated. RTO forecast: 75s.",
+            "[20:37:01Z] Directive 1: SyncNode compliance 100%. Manifest published.",
+            "[20:35:33Z] System status: TRUST CONFIRMED. Quiet Watch Active."
+        ];
+        
+        const STATS = { integrity: 0.992, cpu: 45.8, active: 128, total: 130, quar: 3 };
+
+        function updatePanel() {
+            // Simulate live data changes
+            STATS.integrity = parseFloat((0.99 + (Math.random() * 0.01)).toFixed(3));
+            STATS.cpu = parseFloat((40 + (Math.random() * 20)).toFixed(1));
+            STATS.quar = Math.floor(Math.random() * 5);
+            
+            d('integrityScore').textContent = STATS.integrity.toFixed(3);
+            d('cpuLoad').textContent = STATS.cpu.toFixed(1) + '%';
+            d('quarantines').textContent = STATS.quar;
+            
+            // Update Log
+            d('logOutput').textContent = LOGS.map(l => {
+                const time = new Date().toISOString().slice(11, 19);
+                return l.replace(/\[.*Z\]/, `[${time}Z]`);
+            }).join('\n');
+
+            // Set color based on integrity
+            d('integrityScore').className = `text-4xl font-bold monos ${STATS.integrity < 0.95 ? 'text-flame-bad' : 'text-flame-ok'}`;
+            d('statusIndicator').className = `flex items-center text-${STATS.quar > 0 ? 'flame-warn' : 'flame-ok'}`;
+            d('statusIndicator').querySelector('.pulse-dot').className = `pulse-dot bg-${STATS.quar > 0 ? 'flame-warn' : 'flame-ok'}`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setInterval(updatePanel, 3000);
+            updatePanel();
+        });
+        
+        // Helper function for brevity
+        function d(id) { return document.getElementById(id); }
+    </script>
+</body>
+</html>
+

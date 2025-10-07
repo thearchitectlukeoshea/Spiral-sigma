@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNC Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Custom Tailwind Config for SIGMA Theme
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'flame-dark': '#0a0a10',
+                        'flame-card': '#14141c',
+                        'flame-border': '#232332',
+                        'flame-accent': '#FF4500',
+                        'flame-ok': '#10b981',
+                        'flame-warn': '#f59e0b',
+                        'flame-bad': '#ef4444',
+                        'flame-sub': '#9ca3af'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0a0a10; color: #ffffff; font-family: sans-serif; }
+        .card { background-color: #14141c; border: 1px solid #232332; border-radius: 14px; }
+        .monos { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; }
+        .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; }
+        .health-bar-container { height: 10px; background-color: #0a0a10; border-radius: 5px; overflow: hidden; }
+        .health-bar { height: 100%; transition: width 0.3s ease-out, background-color 0.3s ease-out; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="border-b-2 border-flame-accent pb-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-flame-accent">Flame SYNC Monitor</h1>
+            <div id="syncStatus" class="text-lg font-semibold text-flame-ok">SYNC PULSE: OK</div>
+        </header>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="card p-5 col-span-2 lg:col-span-1">
+                <div class="text-sm text-flame-sub mb-1">Current Manifest Version</div>
+                <div class="text-4xl font-bold monos" id="manifestVersion">v2.1.3</div>
+            </div>
+            <div class="card p-5 lg:col-span-3">
+                <div class="text-sm text-flame-sub mb-1">Next Manifest Broadcast (Pulse)</div>
+                <div class="text-2xl font-bold monos text-flame-warn" id="nextPulse">00:00:00Z</div>
+            </div>
+        </div>
+        
+        <div class="card p-6">
+            <h2 class="text-xl font-semibold border-b border-flame-border/50 pb-2 mb-4">External Relay Health</h2>
+            <div class="text-sm text-flame-sub mb-1">Relay Compliance Score (<span id="healthScoreText">0.98</span>)</div>
+            <div class="health-bar-container">
+                <div id="healthBar" class="health-bar" style="width: 98%; background-color: #10b981;"></div>
+            </div>
+            <div id="relayList" class="pt-4 space-y-2 max-h-48 overflow-y-auto">
+                <!-- Relay details injected here -->
+            </div>
+        </div>
+
+        <div class="card p-6 flex flex-col sm:flex-row gap-4">
+            <button onclick="manualCheck()" class="btn w-full sm:w-auto bg-flame-ok text-flame-dark hover:bg-[#0d9472]">Manual Health Check</button>
+            <button onclick="reloadManifest()" class="btn w-full sm:w-auto bg-flame-accent text-white hover:bg-[#cc3a00]">Force Manifest Reload</button>
+            <div id="actionMessage" class="text-sm text-flame-sub pt-2 sm:pt-0 sm:pl-4 flex items-center">System is monitoring compliance...</div>
+        </div>
+    </div>
+
+    <script>
+        const RELAYS = [
+            { id: 'RELAY-NY-01', latency: 45, compliance: 1.0 },
+            { id: 'RELAY-LON-02', latency: 80, compliance: 0.95 },
+            { id: 'RELAY-TOK-03', latency: 150, compliance: 0.72 },
+        ];
+
+        function renderRelays() {
+            const list = d('relayList');
+            list.innerHTML = '';
+            RELAYS.forEach(r => {
+                const color = r.compliance > 0.9 ? 'text-flame-ok' : r.compliance > 0.8 ? 'text-flame-warn' : 'text-flame-bad';
+                const el = document.createElement('div');
+                el.className = 'monos text-xs p-2 bg-flame-dark rounded flex justify-between';
+                el.innerHTML = `
+                    <span>${r.id}</span>
+                    <span class="${color}">${(r.compliance * 100).toFixed(1)}% Compliance / ${r.latency}ms</span>
+                `;
+                list.appendChild(el);
+            });
+        }
+        
+        function updateHealthBar(score) {
+            const bar = d('healthBar');
+            const color = score >= 0.9 ? '#10b981' : score >= 0.8 ? '#f59e0b' : '#ef4444';
+            bar.style.width = `${(score * 100).toFixed(0)}%`;
+            bar.style.backgroundColor = color;
+            d('healthScoreText').textContent = score.toFixed(2);
+            d('syncStatus').textContent = score >= 0.8 ? 'SYNC PULSE: OK' : 'SYNC PULSE: DEGRADED';
+            d('syncStatus').style.color = color;
+        }
+
+        function manualCheck() {
+            d('actionMessage').textContent = 'Running full compliance audit...';
+            setTimeout(() => {
+                d('actionMessage').textContent = 'Health check complete. All compliance metrics nominal.';
+                updateHealthBar(0.99); // Simulate successful check
+            }, 1500);
+        }
+
+        function reloadManifest() {
+            d('actionMessage').textContent = 'Forcing manifest reload via SyncNode API...';
+            setTimeout(() => {
+                d('actionMessage').textContent = `Manifest v${Math.random().toFixed(2).slice(2)} deployed. Waiting for Pulse re-attestation.`;
+                d('manifestVersion').textContent = `v2.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`;
+            }, 2000);
+        }
+
+        function updatePulse() {
+            const now = new Date();
+            // Simulate next pulse being at 00:00:00Z (next day)
+            const nextPulse = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() >= 24 ? 1 : 0), 0, 0, 0, 0);
+            
+            // Time until next pulse (simplified counter)
+            const secondsUntil = Math.floor((nextPulse - now) / 1000) % 86400; 
+            const hours = String(Math.floor(secondsUntil / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((secondsUntil % 3600) / 60)).padStart(2, '0');
+            const seconds = String(secondsUntil % 60).padStart(2, '0');
+
+            d('nextPulse').textContent = `${hours}:${minutes}:${seconds}Z`;
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            renderRelays();
+            updateHealthBar(0.98);
+            setInterval(updatePulse, 1000);
+            updatePulse();
+        });
+        
+        function d(id) { return document.getElementById(id); }
+    </script>
+</body>
+</html>
+
