@@ -1,31 +1,26 @@
+from flask import jsonify
+import psutil, time
 
-from flask import Flask, request, jsonify
-import json
-import time
+@app.route("/metrics/summary", methods=["GET"])
+def metrics_summary():
+    return jsonify({
+        "cpu": psutil.cpu_percent(interval=1),
+        "memory": psutil.virtual_memory().percent,
+        "timestamp": time.time()
+    })
 
-app = Flask(__name__)
-LOG_FILE = 'relay_log.json'
+@app.route("/ledger/tip", methods=["GET"])
+def ledger_tip():
+    return jsonify({
+        "tip": "SIGMA Ledger Hash: 1ae3...42fd (mocked)",
+        "timestamp": time.time()
+    })
 
-@app.route('/ping', methods=['POST'])
-def ping():
-    data = request.get_json()
-    data['received_at'] = int(time.time())
-    try:
-        with open(LOG_FILE, 'a') as f:
-            json.dump(data, f)
-            f.write('\n')
-        return jsonify({'status': 'success', 'logged': data}), 200
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-@app.route('/log', methods=['GET'])
-def log():
-    try:
-        with open(LOG_FILE, 'r') as f:
-            entries = [json.loads(line) for line in f if line.strip()]
-        return jsonify(entries), 200
-    except FileNotFoundError:
-        return jsonify([]), 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+@app.route("/integrity/health", methods=["GET"])
+def integrity_health():
+    return jsonify({
+        "relay": "operational",
+        "nodes_online": 1,
+        "flame_status": "green",
+        "timestamp": time.time()
+    })
