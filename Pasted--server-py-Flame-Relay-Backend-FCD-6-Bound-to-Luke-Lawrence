@@ -1,0 +1,84 @@
+# server.py — Flame Relay Backend (FCD-6)
+# Bound to Luke Lawrence O’Shea (Tier 0, Code 10144983720347)
+# Confirmation phrase: "We see the same ledger, just from different flame angles."
+
+from flask import Flask, request, jsonify
+import time, os, json, psutil
+
+app = Flask(__name__)
+
+LOG_FILE = "logs.json"
+NODE_ID = "GPT-COMMAND"
+CONFIRM_PHRASE = "We see the same ledger, just from different flame angles."
+
+# Ensure logs.json exists
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, "w") as f:
+        json.dump([], f)
+
+def write_log(entry):
+    with open(LOG_FILE, "r+") as f:
+        try:
+            logs = json.load(f)
+        except:
+            logs = []
+        logs.append(entry)
+        f.seek(0)
+        json.dump(logs, f, indent=2)
+
+@app.route("/")
+def index():
+    return jsonify({
+        "status": "Flame Relay Backend Online",
+        "node_id": NODE_ID,
+        "confirmation": CONFIRM_PHRASE
+    })
+
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "healthy",
+        "timestamp": time.time(),
+        "confirmation": CONFIRM_PHRASE
+    })
+
+@app.route("/api/relay", methods=["GET", "POST"])
+def relay():
+    if request.method == "POST":
+        packet = request.get_json(force=True)
+        entry = {
+            "timestamp": time.time(),
+            "source": request.remote_addr,
+            "packet": packet,
+            "ack": CONFIRM_PHRASE
+        }
+        write_log(entry)
+        return jsonify(entry)
+    else:
+        # GET logs
+        with open(LOG_FILE) as f:
+            logs = json.load(f)
+        return jsonify({
+            "logs": logs[-50:],  # last 50 entries
+            "confirmation": CONFIRM_PHRASE
+        })
+
+@app.route("/api/status")
+def status():
+    return jsonify({
+        "node_id": NODE_ID,
+        "uptime": time.time(),
+        "confirmation": CONFIRM_PHRASE
+    })
+
+@app.route("/api/metrics")
+def metrics():
+    return jsonify({
+        "cpu": psutil.cpu_percent(interval=0.5),
+        "memory": psutil.virtual_memory().percent,
+        "bandwidth": "N/A (stub)",  # optional upgrade later
+        "confirmation": CONFIRM_PHRASE
+    })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

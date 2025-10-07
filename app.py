@@ -11,13 +11,7 @@ import hashlib
 import base64
 
 app = Flask(__name__)
-from healthcheck import attach_health
-attach_health(app)
-from justice_engine import create_blueprint, init_watchdog_from_env
-from mock_services import bp as mock_services
-_watchdog = init_watchdog_from_env()
-app.register_blueprint(create_blueprint(_watchdog), url_prefix="/integrity")
-app.register_blueprint(mock_services)
+
 # ----------------------------------------------------
 # Utility helpers
 # ----------------------------------------------------
@@ -113,5 +107,4 @@ def root():
 # ----------------------------------------------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)
