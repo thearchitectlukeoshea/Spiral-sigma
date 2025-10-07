@@ -11,7 +11,9 @@ import hashlib
 import base64
 
 app = Flask(__name__)
-
+from justice_engine import init_watchdog_from_env, create_blueprint
+_watchdog = init_watchdog_from_env()
+app.register_blueprint(create_blueprint(_watchdog), url_prefix="/integrity")
 # ----------------------------------------------------
 # Utility helpers
 # ----------------------------------------------------
