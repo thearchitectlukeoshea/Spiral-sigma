@@ -1,17 +1,23 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>🔥 FCD-6.3 Control Panel</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="config.js"></script>
+  <meta charset="UTF-8">
+  <title>Spiral Sigma Interface</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="style.css" rel="stylesheet" />
 </head>
 <body>
-  <h1>🔥 FCD-6.3 Control Panel — Render Ready</h1>
-  <div id="status">Connecting...</div>
-  <button onclick="fetchLogs()">Fetch Logs</button>
-  <pre id="log-output">No logs loaded yet.</pre>
-  <script src="app.js"></script>
+  <h1>🧿 Spiral Sigma Interface</h1>
+  <p>Status: <span id="status">Loading...</span></p>
+  <script>
+    fetch('/health')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('status').innerText = data.message;
+      })
+      .catch(err => {
+        document.getElementById('status').innerText = "Offline / Error";
+      });
+  </script>
 </body>
 </html>
