@@ -11,7 +11,20 @@ import hashlib
 import base64
 
 app = Flask(__name__)
+@app.route('/node/register', methods=['POST'])
+def register_node():
+    data = request.json
+    node_id = data.get("node_id")
+    cpu = data.get("cpu_load")
+    memory = data.get("memory_usage_percent")
+    network_sent = data.get("network_io_sent_bytes")
+    network_recv = data.get("network_io_recv_bytes")
+    status = data.get("status")
 
+    # Log or process the data (basic logging for now)
+    print(f"[NODE REGISTER] ID: {node_id}, CPU: {cpu}%, MEM: {memory}%, SENT: {network_sent}, RECV: {network_recv}, STATUS: {status}")
+
+    return jsonify({"result": "node registered", "node_id": node_id}), 200
 # ----------------------------------------------------
 # Utility helpers
 # ----------------------------------------------------
