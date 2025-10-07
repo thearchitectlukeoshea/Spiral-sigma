@@ -13,7 +13,7 @@ import base64
 app = Flask(__name__)
 from healthcheck import attach_health
 attach_health(app)
-from justice_engine import init_watchdog_from_env, create_blueprint
+from justice_engine import create_blueprint, init_watchdog_from_env
 from mock_services import bp as mock_services
 _watchdog = init_watchdog_from_env()
 app.register_blueprint(create_blueprint(_watchdog), url_prefix="/integrity")
