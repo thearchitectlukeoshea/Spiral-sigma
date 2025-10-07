@@ -812,9 +812,52 @@ function refreshAll() {
 
 setInterval(refreshAll, 60000); // Every 60s
 window.onload = refreshAll;
-</script>
-</body<pre id="integrity-status">Loading /integrity/health...</pre>
-<pre id="metrics-summary">Loading /metrics/summary...</pre>
-<pre id="ledger-tip">Loading /ledger/tip...</pre>>
+</script<script>
+const renderBackendUrl = "https://spiral-sigma.onrender.com";
+
+// Fetch Integrity Health
+async function fetchIntegrityHealth() {
+  try {
+    const response = await fetch(`${renderBackendUrl}/integrity/health`);
+    const data = await response.json();
+    document.getElementById("integrity-status").innerText = JSON.stringify(data, null, 2);
+  } catch (error) {
+    document.getElementById("integrity-status").innerText = "Error: " + error;
+  }
+}
+
+// Fetch Metrics Summary
+async function fetchMetricsSummary() {
+  try {
+    const response = await fetch(`${renderBackendUrl}/metrics/summary`);
+    const data = await response.json();
+    document.getElementById("metrics-summary").innerText = JSON.stringify(data, null, 2);
+  } catch (error) {
+    document.getElementById("metrics-summary").innerText = "Error: " + error;
+  }
+}
+
+// Fetch Ledger Tip
+async function fetchLedgerTip() {
+  try {
+    const response = await fetch(`${renderBackendUrl}/ledger/tip`);
+    const data = await response.json();
+    document.getElementById("ledger-tip").innerText = JSON.stringify(data, null, 2);
+  } catch (error) {
+    document.getElementById("ledger-tip").innerText = "Error: " + error;
+  }
+}
+
+// Refresh all
+function refreshAll() {
+  fetchIntegrityHealth();
+  fetchMetricsSummary();
+  fetchLedgerTip();
+}
+
+setInterval(refreshAll, 60000); // Every 60s
+window.onload = refreshAll;
+</script>>
+</body>
 </html>
 
