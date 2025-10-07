@@ -3,3 +3,4 @@ python-dotenv
 hmac
 hashlib
 base64
+requests
