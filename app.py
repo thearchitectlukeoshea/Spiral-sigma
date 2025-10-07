@@ -13,18 +13,25 @@ import base64
 app = Flask(__name__)
 @app.route('/node/register', methods=['POST'])
 def register_node():
-    data = request.json
-    node_id = data.get("node_id")
-    cpu = data.get("cpu_load")
-    memory = data.get("memory_usage_percent")
-    network_sent = data.get("network_io_sent_bytes")
-    network_recv = data.get("network_io_recv_bytes")
-    status = data.get("status")
-
-    # Log or process the data (basic logging for now)
-    print(f"[NODE REGISTER] ID: {node_id}, CPU: {cpu}%, MEM: {memory}%, SENT: {network_sent}, RECV: {network_recv}, STATUS: {status}")
-
-    return jsonify({"result": "node registered", "node_id": node_id}), 200
+    try:
+        data = request.get_json(force=True)
+        node_id = data.get("node_id")
+        cpu = data.get("cpu_load")
+        mem = data.get("memory_usage_percent")
+        status = data.get("status")
+        
+        # Optional: Log this to file or terminal
+        print(f"✅ NODE REGISTERED: {node_id} | CPU: {cpu}% | MEM: {mem}% | STATUS: {status}")
+        
+        # Reply back to sender
+        return jsonify({
+            "status": "success",
+            "message": f"Node {node_id} registered.",
+            "timestamp": datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        print(f"❌ Registration error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 # ----------------------------------------------------
 # Utility helpers
 # ----------------------------------------------------
