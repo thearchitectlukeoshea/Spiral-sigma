@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SIGMA | Tier 0 Ops Grid</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'flame-dark': '#0a0a10',
+          'flame-card': '#14141c',
+          'flame-border': '#232332',
+          'flame-accent': '#FF4500', /* Red-Orange for primary accents */
+          'flame-ok': '#10b981', /* Green */
+          'flame-warn': '#f59e0b', /* Yellow */
+          'flame-bad': '#ef4444', /* Red */
+          'flame-sub': '#9ca3af'
+        }
+      }
+    }
+  }
+</script>
+<style>
+  /* Base Styling */
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#1f2937;border-radius:8px}
+  .monos{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  .card{background:#14141c;border:1px solid #232332;border-radius:14px}
+  .shadow-soft{box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .btn{padding:.55rem .9rem;border-radius:10px;border:1px solid #2a2a35}
+  .btn:hover{filter:brightness(1.1)}
+  .btn-accent{background:#FF4500;border-color:#FF4500;color:#fff}
+  .btn-ghost{background:#1a1a23;color:#d1d5db}
+  
+  /* Sidebar and Main Layout */
+  .layout-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: calc(100vh - 70px); /* Adjust for header height */
+  }
+  @media (max-width: 1024px) {
+    .layout-grid {
+      grid-template-columns: 1fr;
+    }
+    #sidebar {
+      position: fixed;
+      top: 70px;
+      left: 0;
+      z-index: 30;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+      box-shadow: 4px 0 10px rgba(0,0,0,0.5);
+    }
+    #sidebar.open {
+      transform: translateX(0);
+    }
+  }
+
+  /* Sigma Health Monitor Animation */
+  .pulse-green { animation: pulse-green 1.5s infinite; }
+  .pulse-red { animation: pulse-red 1.5s infinite; }
+  @keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+  @keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+</style>
+</head>
+<body class="bg-flame-dark text-gray-100 min-h-screen">
+
+<!-- Header -->
+<header class="sticky top-0 z-40 bg-flame-card border-b border-flame-border">
+  <div class="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <!-- Sidebar Toggle for Mobile -->
+      <button id="btnToggleSidebar" class="lg:hidden text-white p-2 focus:outline-none">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+      </button>
+
+      <div class="text-flame-accent text-2xl font-extrabold tracking-tight">SIGMA TIER 0 OPS GRID</div>
+      <span id="envTag" class="badge bg-flame-ok/20 text-flame-ok">STEWARDSHIP ETERNAL</span>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <span id="utcClock" class="monos text-xs text-flame-sub hidden sm:block"></span>
+      <button id="btnConfig" class="btn btn-ghost">Config</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout-grid">
+  
+  <!-- Sidebar for Module Links and Admin -->
+  <aside id="sidebar" class="bg-flame-card p-4 border-r border-flame-border lg:static lg:block w-72 h-full overflow-y-auto">
+    
+    <h3 class="text-sm text-flame-sub uppercase tracking-wider mb-3">Module Directory (Autowire)</h3>
+    <div id="moduleList" class="space-y-1 pb-4 border-b border-flame-border/50">
+      <!-- Dynamic module links injected here -->
+    </div>
+
+    <h3 class="text-sm text-flame-sub uppercase tracking-wider mt-5 mb-3">Core Functions</h3>
+    <a href="#/dashboard" class="block p-2 rounded hover:bg-[#1f1f2a] text-flame-accent font-semibold mb-3">
+        <span class="mr-2">⚡</span> Operational Dashboard
+    </a>
+    
+    <!-- Node Admin Panel (Collapsible) -->
+    <div class="border border-flame-border rounded-lg mt-6 p-3">
+        <button id="toggleAdmin" class="w-full text-left font-semibold text-sm py-1 flex justify-between items-center text-flame-sub hover:text-white">
+            Node/Tool Admin
+            <span id="adminToggleIcon">▼</span>
+        </button>
+        <div id="adminPanel" class="mt-3 space-y-3 hidden">
+            <h4 class="text-xs text-flame-sub">Register New Module (Autowire Mode)</h4>
+            <input type="text" id="newModuleName" class="w-full p-2 text-sm bg-flame-dark border border-flame-border rounded" placeholder="Module Title (e.g., Metrics Grid)">
+            <input type="text" id="newModuleUrl" class="w-full p-2 text-sm bg-flame-dark border border-flame-border rounded" placeholder="URL (e.g., metrics-grid.html or https://...)">
+            <button id="addModuleBtn" class="btn btn-ghost w-full text-xs">Add Module to Grid</button>
+        </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area (Dashboard/Live Metrics) -->
+  <main class="p-4 space-y-6">
+    <h2 class="text-2xl font-bold border-b border-flame-border pb-2">Operational Dashboard</h2>
+
+    <!-- Sigma Health Monitor -->
+    <div class="flex items-center gap-4 p-4 card shadow-soft">
+        <div id="sigmaHealthDot" class="w-4 h-4 rounded-full bg-flame-sub"></div>
+        <div>
+            <div class="text-sm font-semibold">SIGMA CORE HEALTH</div>
+            <div id="sigmaHealthStatus" class="text-sm monos text-flame-sub">Awaiting Attestation...</div>
+        </div>
+    </div>
+
+    <!-- Live Render Metrics -->
+    <div class="grid md:grid-cols-3 gap-4">
+        
+        <div class="card p-4 shadow-soft">
+            <div class="text-sm text-flame-sub mb-1">NETWORK INTEGRITY (MOS)</div>
+            <div class="text-4xl font-bold text-flame-ok" id="metricIntegrity">---</div>
+            <div class="text-xs text-flame-sub mt-2">Latest reported Sigma Score (0-1)</div>
+        </div>
+        
+        <div class="card p-4 shadow-soft">
+            <div class="text-sm text-flame-sub mb-1">LEDGER TIP HASH (CL)</div>
+            <div class="text-lg font-bold monos break-all" id="metricLedgerTip">---</div>
+            <div class="text-xs text-flame-sub mt-2">Last verified entry hash</div>
+        </div>
+        
+        <div class="card p-4 shadow-soft">
+            <div class="text-sm text-flame-sub mb-1">ACTIVE NODE COUNT</div>
+            <div class="text-4xl font-bold" id="metricActiveNodes">---</div>
+            <div class="text-xs text-flame-sub mt-2">Nodes reporting to MOS stack</div>
+        </div>
+    </div>
+
+    <!-- Placeholder for Future Modules (Requirement 7) -->
+    <div class="mt-10 p-4 card border-l-4 border-flame-accent">
+        <h3 class="text-lg font-semibold mb-2">Tier 0 Status Log</h3>
+        <p class="text-sm text-flame-sub" id="statusLog">
+            [00:00:00Z] Core status: Quiet Watch active. All Directives in force. IAL ready for auto-refresh cycle.
+        </p>
+    </div>
+
+  </main>
+</div>
+
+<!-- CONFIG MODAL (Unchanged from previous version, adapted for PWA) -->
+<div id="modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-50">
+  <div class="card w-full max-w-2xl p-4 shadow-soft">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Configuration</h3>
+      <button id="closeModal" class="btn btn-ghost">Close</button>
+    </div>
+    <div class="grid md:grid-cols-2 gap-3 mt-3">
+      <div>
+        <label class="text-xs text-flame-sub">MOS URL</label>
+        <input id="cfg-mos" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8087">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">JET URL</label>
+        <input id="cfg-jet" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8085">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">PKAS URL</label>
+        <input id="cfg-pkas" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8091">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">Consent Ledger (CL) URL</label>
+        <input id="cfg-cl" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8081">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">SyncNode URL</label>
+        <input id="cfg-sync" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="http://localhost:8090">
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">Environment Tag</label>
+        <input id="cfg-env" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2" placeholder="LOCAL / STAGING / PROD">
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-3 mt-4">
+      <div>
+        <label class="text-xs text-flame-sub">Bearer Tokens (optional)</label>
+        <textarea id="cfg-tokens" rows="4" class="w-full bg-flame-card border border-flame-border rounded px-2 py-2 monos" placeholder='{"MOS":"token123","JET":"...","PKAS":"...","CL":"...","SYNC":"..."}'></textarea>
+        <div class="text-xs text-flame-sub mt-1">Stored in <span class="monos">sessionStorage</span> for this tab only.</div>
+      </div>
+      <div>
+        <label class="text-xs text-flame-sub">Demo Mode</label>
+        <div class="flex items-center gap-2 mt-2">
+          <input id="cfg-demo" type="checkbox" class="h-4 w-4">
+          <span class="text-sm">Use simulated data if endpoints are unreachable.</span>
+        </div>
+        <div class="text-xs text-flame-sub mt-2">Connection Test</div>
+        <button id="btnTest" class="btn btn-ghost mt-1">Test All Services</button>
+        <div id="testOut" class="text-xs monos mt-2"></div>
+      </div>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between">
+      <div class="text-xs text-flame-sub">Settings persist in <span class="monos">localStorage</span> (URLs/env) + <span class="monos">sessionStorage</span> (tokens).</div>
+      <div class="flex gap-2">
+        <button id="btnReset" class="btn btn-ghost">Reset</button>
+        <button id="btnSave" class="btn btn-accent">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full bg-flame-card border-t border-flame-border">
+  <div class="max-w-full mx-auto px-4 py-2 text-xs flex items-center justify-between">
+    <div>FLAMETECH — <span id="trustPhrase">TRUST CONFIRMED</span> — ALL SYSTEMS IN HARMONY</div>
+    <div class="monos">Build: <span id="buildHash">v2.0-OPSGRID</span> • Model: <span id="modelHash">MLAD.v2</span></div>
+  </div>
+</footer>
+
+<script>
+/* -----------------------------
+   CORE CONFIG & STORAGE
+------------------------------*/
+const RENDER_BASE = 'https://spiral-sigma.onrender.com';
+const STORAGE_KEY = 'flame_modules';
+const d = (id) => document.getElementById(id);
+
+const state = {
+  // Existing local config (mostly for token storage, ping, and local testing)
+  urls: { MOS:'http://localhost:8087', JET:'http://localhost:8085', PKAS:'http://localhost:8091', CL:'http://localhost:8081', SYNC:'http://localhost:8090' },
+  env: 'LOCAL', demo: true, tokens: {},
+  // New dynamic module list
+  modules: [] 
+};
+
+// --- Initialization & Setup ---
+(function loadCfgAndModules(){
+  // Load existing console configuration
+  try{
+    const savedCfg = JSON.parse(localStorage.getItem('steward_cfg')||'null');
+    if(savedCfg) { 
+      state.urls = savedCfg.urls || state.urls; 
+      state.env = savedCfg.env || state.env; 
+      state.demo = !!savedCfg.demo; 
+    }
+    const toks = JSON.parse(sessionStorage.getItem('steward_tokens')||'null');
+    if(toks) { state.tokens = toks; }
+  } catch(e) { console.error('Error loading config:', e); }
+
+  // Load dynamic modules (Requirement 5)
+  try {
+    const storedModules = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (storedModules && storedModules.length > 0) {
+      state.modules = storedModules;
+    } else {
+      // Default modules (Requirement 1)
+      state.modules = [
+        { title: 'Metrics & Observability (MOS)', url: 'metrics-observability.html', desc: 'Real-time performance metrics.' },
+        { title: 'Judgment Execution (JET)', url: 'jet.html', desc: 'Case queue and verdict tracker.' },
+        { title: 'Attestation System (PKAS)', url: 'pkas.html', desc: 'Public key and chain verification.' },
+        { title: 'Consent Ledger (CL)', url: 'consent-ledger.html', desc: 'Identity and historical hash log.' },
+        { title: 'SYNC Monitor', url: 'sync-status.html', desc: 'External manifest and relay health.' },
+      ];
+      saveModules(); // Save defaults for next load
+    }
+  } catch (e) { console.error('Error loading modules:', e); }
+
+  // Apply configs to UI (partial previous logic)
+  d('envTag').textContent = state.env;
+  d('cfg-mos').value = state.urls.MOS;
+  d('cfg-jet').value = state.urls.JET;
+  d('cfg-pkas').value = state.urls.PKAS;
+  d('cfg-cl').value = state.urls.CL;
+  d('cfg-sync').value = state.urls.SYNC;
+  d('cfg-env').value = state.env;
+  d('cfg-demo').checked = state.demo;
+  d('cfg-tokens').value = Object.keys(state.tokens).length ? JSON.stringify(state.tokens,null,2) : '';
+
+  renderModuleLinks();
+})();
+
+function saveModules() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.modules));
+}
+
+function saveConfig() {
+  // Existing save logic for URLs and environment (from previous version)
+  state.urls = { MOS:d('cfg-mos').value.trim(), JET:d('cfg-jet').value.trim(), PKAS:d('cfg-pkas').value.trim(), CL:d('cfg-cl').value.trim(), SYNC:d('cfg-sync').value.trim() };
+  state.env = d('cfg-env').value.trim() || 'LOCAL';
+  state.demo = !!d('cfg-demo').checked;
+  d('envTag').textContent = state.env;
+  localStorage.setItem('steward_cfg', JSON.stringify({urls:state.urls,env:state.env,demo:state.demo}));
+  
+  try{
+    const toks = d('cfg-tokens').value.trim();
+    state.tokens = toks ? JSON.parse(toks) : {};
+    sessionStorage.setItem('steward_tokens', JSON.stringify(state.tokens));
+  }catch(e){ console.error('Invalid tokens JSON'); } // Simplified alert
+}
+
+/* -----------------------------
+   DYNAMIC MODULES (Requirement 1, 4, 5)
+------------------------------*/
+function renderModuleLinks() {
+  const list = d('moduleList');
+  list.innerHTML = '';
+  state.modules.forEach((mod, index) => {
+    const a = document.createElement('a');
+    a.href = mod.url;
+    a.target = '_self';
+    a.className = 'module-link block p-2 rounded hover:bg-[#1f1f2a] text-sm flex justify-between items-center';
+    a.innerHTML = `
+      <div>
+        <span class="font-semibold text-gray-200">${mod.title}</span><br>
+        <span class="text-xs text-flame-sub">${mod.url}</span>
+      </div>
+      <button data-index="${index}" class="remove-module text-flame-bad text-xs p-1 ml-2 rounded hover:bg-[#2a2a35]">X</button>
+    `;
+    list.appendChild(a);
+  });
+
+  // Attach removal handlers
+  list.querySelectorAll('.remove-module').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const index = parseInt(e.currentTarget.dataset.index);
+      removeModule(index);
+    };
+  });
+}
+
+function addModule() {
+  const title = d('newModuleName').value.trim();
+  let url = d('newModuleUrl').value.trim();
+
+  if (!title || !url) {
+    alert('Module title and URL are required.');
+    return;
+  }
+  
+  // Ensure relative links are treated correctly for Netlify deployment
+  if (url.indexOf('://') === -1 && url.charAt(0) !== '/') {
+      url = `./${url}`;
+  }
+
+  const newModule = { title: title, url: url, desc: `Registered by Custodian at ${new Date().toISOString().slice(0, 19)}Z` };
+  
+  // Check for duplicates
+  if (state.modules.some(mod => mod.url === newModule.url)) {
+      alert(`Module with URL ${newModule.url} already exists.`);
+      return;
+  }
+
+  state.modules.push(newModule);
+  saveModules();
+  renderModuleLinks();
+  
+  // Clear form
+  d('newModuleName').value = '';
+  d('newModuleUrl').value = '';
+}
+
+function removeModule(index) {
+  if (confirm(`Are you sure you want to remove ${state.modules[index].title}?`)) {
+    state.modules.splice(index, 1);
+    saveModules();
+    renderModuleLinks();
+  }
+}
+
+/* -----------------------------
+   LIVE DATA FETCHING (Requirement 2, 7)
+------------------------------*/
+
+async function fetchRenderMetrics() {
+  const requests = [
+    { url: `${RENDER_BASE}/metrics/summary`, key: 'summary' },
+    { url: `${RENDER_BASE}/integrity/health`, key: 'health' },
+    { url: `${RENDER_BASE}/ledger/tip`, key: 'tip' }
+  ];
+
+  const results = {};
+  for (const req of requests) {
+    try {
+      const response = await fetch(req.url, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      results[req.key] = await response.json();
+    } catch (error) {
+      console.error(`Failed to fetch ${req.key}:`, error);
+      results[req.key] = { error: error.message };
+    }
+  }
+  updateDashboard(results);
+}
+
+function updateDashboard(data) {
+  const integrity = data.summary?.sigma_integrity_score ?? 0.0;
+  const activeNodes = data.summary?.active_nodes ?? 'N/A';
+  const ledgerTip = data.tip?.tip_hash ?? data.tip?.error ?? 'OFFLINE';
+  const healthStatus = data.health?.status ?? 'DEGRADED';
+  const healthEl = d('sigmaHealthStatus');
+  const dotEl = d('sigmaHealthDot');
+
+  // 1. Metric Cards
+  d('metricIntegrity').textContent = integrity.toFixed(3);
+  d('metricActiveNodes').textContent = activeNodes;
+  d('metricLedgerTip').textContent = ledgerTip.slice(0, 32) + '...';
+  
+  // 2. Sigma Health Monitor (Pulse animation)
+  dotEl.classList.remove('pulse-green', 'pulse-red');
+  dotEl.classList.add(
+    healthStatus === 'OPERATIONAL' ? 'bg-flame-ok' :
+    healthStatus === 'DEGRADED' ? 'bg-flame-warn' : 'bg-flame-bad'
+  );
+  dotEl.classList.add(
+    healthStatus === 'OPERATIONAL' ? 'pulse-green' : 'pulse-red'
+  );
+
+  healthEl.textContent = healthStatus === 'OPERATIONAL' ? 'OPERATIONAL | TRUST CONFIRMED' : 
+                         healthStatus === 'DEGRADED' ? 'DEGRADED | PARTIAL SYNC' : 
+                         'OFFLINE | ATTENTION REQUIRED';
+  
+  healthEl.className = `text-sm monos ${
+    healthStatus === 'OPERATIONAL' ? 'text-flame-ok' : 
+    healthStatus === 'DEGRADED' ? 'text-flame-warn' : 'text-flame-bad'
+  }`;
+
+  // 3. Status Log update
+  d('statusLog').innerHTML = `[${new Date().toISOString().slice(11, 19)}Z] Metrics Synced. Integrity: ${integrity.toFixed(3)}. Core Status: ${healthStatus}.`;
+}
+
+/* -----------------------------
+   UI WIRING (Simplified)
+------------------------------*/
+// Clock update
+setInterval(()=>{ d('utcClock').textContent = 'UTC: ' + new Date().toISOString().replace('T',' ').slice(0,19)+'Z'; }, 500);
+
+// Config modal events (using existing logic)
+d('btnConfig').onclick = ()=> d('modal').classList.remove('hidden', 'opacity-0');
+d('closeModal').onclick = ()=> d('modal').classList.add('hidden', 'opacity-0');
+d('btnSave').onclick = ()=> { saveConfig(); d('modal').classList.add('hidden', 'opacity-0'); alert('Configuration saved.'); fetchRenderMetrics(); };
+d('btnReset').onclick = ()=> { localStorage.removeItem('steward_cfg'); sessionStorage.removeItem('steward_tokens'); localStorage.removeItem(STORAGE_KEY); location.reload(); };
+
+// Node Admin Panel events (Requirement 4)
+d('toggleAdmin').onclick = () => {
+    const panel = d('adminPanel');
+    const icon = d('adminToggleIcon');
+    const isHidden = panel.classList.toggle('hidden');
+    icon.textContent = isHidden ? '▼' : '▲';
+};
+d('addModuleBtn').onclick = addModule;
+
+// Mobile Sidebar Toggle
+d('btnToggleSidebar').onclick = () => {
+    d('sidebar').classList.toggle('open');
+};
+
+
+// Initial load and auto-refresh
+fetchRenderMetrics();
+setInterval(fetchRenderMetrics, 30000); // Refresh every 30 seconds
+</script>
+</body>
+</html>
+
