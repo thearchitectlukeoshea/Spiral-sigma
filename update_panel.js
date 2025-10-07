@@ -1,8 +1,12 @@
+<script>
+async function fetchMetrics() {
+  const res = await fetch("https://spiral-sigma.onrender.com/metrics/summary");
+  const data = await res.json();
+  document.getElementById("cpu").innerText = `CPU Load: ${data.cpu}%`;
+  document.getElementById("mem").innerText = `Memory: ${data.memory}%`;
+}
+setInterval(fetchMetrics, 60000);
+</script>
 
-setInterval(() => {
-  fetch('https://your-relay.repl.co/log')
-    .then(res => res.json())
-    .then(data => {
-      document.getElementById('flame-log').innerText = JSON.stringify(data, null, 2);
-    });
-}, 3000);
+<div id="cpu">Loading CPU...</div>
+<div id="mem">Loading Mem...</div>
