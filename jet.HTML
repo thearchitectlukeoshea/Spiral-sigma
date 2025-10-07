@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JET | Judgment Execution Tracker</title>
+    <style>
+        /* Global Reset and Dark Theme */
+        :root {
+            --bg-color: #1a1a1a;
+            --card-color: #242424;
+            --text-color: #ffffff;
+            --accent-color: #10b981;
+            --sub-color: #888888;
+            --border-color: #333333;
+            --reject-color: #ef4444;
+            --approve-color: #22c55e;
+            --defer-color: #f59e0b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        .timestamp {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--sub-color);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: var(--card-color);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .card-title {
+            font-size: 0.9rem;
+            color: var(--sub-color);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .card-value {
+            font-size: 2.0rem;
+            font-weight: 600;
+            color: var(--text-color);
+            font-family: 'Courier New', monospace;
+        }
+        /* Sync Indicator Styling */
+        .sync-status {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .blink-dot {
+            height: 12px;
+            width: 12px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+            animation: blink 1s infinite alternate;
+        }
+        @keyframes blink {
+            from { opacity: 1; }
+            to { opacity: 0.2; }
+        }
+        /* Table Styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            color: var(--accent-color);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+        .verdict-tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.75rem;
+            display: inline-block;
+        }
+        .tag-approve { background-color: var(--approve-color); color: var(--bg-color); }
+        .tag-reject { background-color: var(--reject-color); color: var(--text-color); }
+        .tag-defer { background-color: var(--defer-color); color: var(--bg-color); }
+
+        @media (max-width: 600px) {
+            table thead { display: none; }
+            table, tbody, tr, td { display: block; width: 100%; }
+            td {
+                text-align: right;
+                padding-left: 50%;
+                position: relative;
+            }
+            td::before {
+                content: attr(data-label);
+                position: absolute;
+                left: 10px;
+                width: 45%;
+                padding-right: 10px;
+                white-space: nowrap;
+                color: var(--sub-color);
+                font-family: sans-serif;
+                font-weight: bold;
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Judgment Execution Tracker (JET)</h1>
+            <div id="timestamp" class="timestamp"></div>
+        </header>
+
+        <div class="sync-status">
+            <span class="blink-dot"></span>
+            SYNC STATUS: REAL-TIME LATTICE FEED
+        </div>
+
+        <div class="stats-grid">
+            <div class="card">
+                <div class="card-title">ACTIVE TRIBUNALS</div>
+                <div class="card-value" id="activeTribunals">--</div>
+            </div>
+            <div class="card">
+                <div class="card-title">QUEUE DEPTH (PENDING)</div>
+                <div class="card-value" id="queueDepth">--</div>
+            </div>
+            <div class="card">
+                <div class="card-title">NEXT CASE ID</div>
+                <div class="card-value" id="nextCaseId">--</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Judgments (Simulated /jet/log)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Case ID</th>
+                        <th>Node</th>
+                        <th>Verdict</th>
+                        <th>Latency (ms)</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="judgmentTable">
+                    <!-- Data will be inserted here by script -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const MOCK_DATA = {
+            "active_tribunals": 4,
+            "queue_depth": 18,
+            "next_case_id": "J-9382-A",
+            "recent_judgments": [
+                {"id": "J-9381", "node": "alpha-7", "verdict": "APPROVE", "latency": 120, "time": new Date(Date.now() - 60000)},
+                {"id": "J-9380", "node": "beta-12", "verdict": "DEFER", "latency": 850, "time": new Date(Date.now() - 120000)},
+                {"id": "J-9379", "node": "zeta-4", "verdict": "REJECT", "latency": 90, "time": new Date(Date.now() - 180000)},
+                {"id": "J-9378", "node": "custodian-01", "verdict": "APPROVE", "latency": 450, "time": new Date(Date.now() - 240000)},
+            ]
+        };
+
+        function updateUI() {
+            // Update timestamp
+            document.getElementById('timestamp').textContent = 'UTC: ' + new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+            // Update stats cards
+            document.getElementById('activeTribunals').textContent = MOCK_DATA.active_tribunals;
+            document.getElementById('queueDepth').textContent = MOCK_DATA.queue_depth;
+            document.getElementById('nextCaseId').textContent = MOCK_DATA.next_case_id;
+
+            // Update table
+            const tableBody = document.getElementById('judgmentTable');
+            tableBody.innerHTML = '';
+
+            MOCK_DATA.recent_judgments.forEach(j => {
+                const row = tableBody.insertRow();
+                const verdictClass = j.verdict === 'APPROVE' ? 'tag-approve' : j.verdict === 'REJECT' ? 'tag-reject' : 'tag-defer';
+                const timeString = new Date(j.time).toISOString().slice(11, 19);
+
+                row.insertCell().innerHTML = `<span data-label="Case ID">${j.id}</span>`;
+                row.insertCell().innerHTML = `<span data-label="Node">${j.node}</span>`;
+                row.insertCell().innerHTML = `<span data-label="Verdict" class="verdict-tag ${verdictClass}">${j.verdict}</span>`;
+                row.insertCell().innerHTML = `<span data-label="Latency (ms)">${j.latency}</span>`;
+                row.insertCell().innerHTML = `<span data-label="Timestamp">${timeString}Z</span>`;
+            });
+
+            // Simulation: Mock data update
+            MOCK_DATA.queue_depth = Math.max(5, MOCK_DATA.queue_depth + Math.floor(Math.random() * 3) - 1);
+        }
+
+        updateUI();
+        setInterval(updateUI, 2000); // Fast refresh for active tracker
+    </script>
+</body>
+</html>
+
