@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIGMA OPSGRID // Unified Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #0A0A0A;
+            --color-primary: #FF8A00;
+            --color-secondary: #00B8FF;
+            --color-text: #E0E0E0;
+            --color-text-muted: #888888;
+            --color-border: #2a2a2a;
+            --color-success: #00FF41;
+            --color-fail: #FF3A3A;
+            --color-warn: #FFD600;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .font-mono {
+            font-family: 'Roboto Mono', monospace;
+        }
+        .header-flame {
+            color: var(--color-primary);
+            text-shadow: 0 0 8px rgba(255, 138, 0, 0.7);
+        }
+        .tile {
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            transition: all 0.3s ease-in-out;
+        }
+        .tile:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 20px rgba(0, 184, 255, 0.2);
+            border-color: var(--color-secondary);
+        }
+        .status-ok { border-left: 4px solid var(--color-success); }
+        .status-fail { border-left: 4px solid var(--color-fail); }
+        .status-disconnected { border-left: 4px solid var(--color-warn); }
+        .status-ok:hover { box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); border-color: var(--color-success); }
+        .status-fail:hover { box-shadow: 0 0 20px rgba(255, 58, 58, 0.2); border-color: var(--color-fail); }
+        .status-disconnected:hover { box-shadow: 0 0 20px rgba(255, 214, 0, 0.2); border-color: var(--color-warn); }
+
+        #commandBox {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+        }
+        #commandBox:focus {
+            outline: none;
+            border-color: var(--color-secondary);
+            box-shadow: 0 0 10px rgba(0, 184, 255, 0.3);
+        }
+        .btn-push {
+            background-color: var(--color-secondary);
+            color: var(--color-bg);
+            transition: all 0.2s ease;
+        }
+        .btn-push:hover {
+            background-color: #33c6ff;
+            box-shadow: 0 0 15px rgba(0, 184, 255, 0.5);
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: max-content;
+            max-width: 250px;
+            background-color: #111;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            border: 1px solid var(--color-border);
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .toast {
+            background-color: rgba(30, 30, 30, 0.9);
+            backdrop-filter: blur(5px);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--color-border);
+            opacity: 0;
+            transform: translateX(100%);
+            animation: slideIn 0.5s forwards;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .toast-warn { border-left: 4px solid var(--color-warn); }
+        .toast-success { border-left: 4px solid var(--color-success); }
+        .toast-error { border-left: 4px solid var(--color-fail); }
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="toast-container"></div>
+
+    <header class="text-center mb-8">
+        <h1 class="text-4xl md:text-5xl font-bold header-flame">SIGMA OPSGRID</h1>
+        <p class="text-gray-400 mt-2 font-mono">SYSTEM STATUS: <span id="system-status-text">INITIALIZING...</span></p>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- System Control & Orchestrator Status -->
+        <section class="md:col-span-1 space-y-6">
+            <div class="tile p-4 rounded-lg">
+                <h2 class="font-bold text-lg mb-2 text-gray-200 border-b border-gray-700 pb-2">Orchestrator</h2>
+                <div id="orchestrator-status" class="font-mono text-sm space-y-2">
+                    <p>Agent ID: <span class="text-gray-400">PENDING</span></p>
+                    <p>Last Check: <span class="text-gray-400">PENDING</span></p>
+                    <p>Trust Score: <span class="text-gray-400">PENDING</span></p>
+                </div>
+            </div>
+             <div class="tile p-4 rounded-lg">
+                <h2 class="font-bold text-lg mb-3 text-gray-200 border-b border-gray-700 pb-2">Update Console</h2>
+                <div id="update-console" class="space-y-3">
+                    <input type="text" id="commandBox" class="w-full p-2 rounded-md font-mono text-sm" placeholder="Paste code snippet or command...">
+                    <button id="pushButton" class="w-full btn-push font-bold py-2 rounded-md">PUSH UPDATE</button>
+                    <p id="console-status" class="text-xs text-center text-gray-500 h-4"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dynamic Endpoint Tiles -->
+        <section class="md:col-span-2">
+            <div id="endpoint-dashboard" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                <!-- Endpoint tiles will be dynamically inserted here -->
+            </div>
+        </section>
+    </main>
+    
+    <!-- This div is for live HTML injection from the console -->
+    <div id="live-injection-target" class="mt-8"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // ===================================================================================
+        // VIRTUAL FILE SYSTEM & MOCK DATA
+        // In a real environment, this would be handled by a backend server.
+        // Here, we simulate it with in-memory objects.
+        // ===================================================================================
+        const VFS = {
+            '/public/agent_status.json': {
+                agentId: 'ADAPTIVE-01',
+                timestamp: new Date().toISOString(),
+                trust_score: 1.0,
+                environment: 'SIMULATED_BROWSER',
+                endpoints: [] // Will be populated by the agent
+            },
+            '/updates/queue.txt': '',
+            '/logs/command_log.json': []
+        };
+        const MOCK_DATA_FALLBACK = {
+            status: 'Disconnected',
+            message: 'Endpoint unreachable. Displaying cached data.',
+            last_seen: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+        };
+
+        // ===================================================================================
+        // UI HELPER: TOAST NOTIFICATIONS
+        // ===================================================================================
+        const showToast = (message, type = 'warn') => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.5s forwards';
+                toast.addEventListener('animationend', () => toast.remove());
+            }, 5000);
+        };
+        
+        // ===================================================================================
+        // MODULE: /modules/agent_adaptive/agent.js
+        // This agent detects its environment and checks the health of various endpoints.
+        // ===================================================================================
+        const AdaptiveAgent = {
+            config: {
+                // These will fail gracefully as they don't exist.
+                // In a real scenario, some would be valid endpoints.
+                endpointsToScan: [
+                    'index.html', // Should be OK
+                    'metrics-observability.html',
+                    'sync-status.html',
+                    'pkas.html',
+                    'https://heroic-puppy-fd0b06.netlify.app', // External check
+                    'https://neon-treacle-34f20d.netlify.app/',
+                    'https://this-endpoint-will-fail-404.com/404'
+                ],
+                scanInterval: 30000 // 30 seconds
+            },
+
+            async checkEndpoint(url) {
+                try {
+                    // Use HEAD request for efficiency - we only need status, not content
+                    const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' }); 
+                    
+                    // Note: 'no-cors' results in an opaque response, status is 0 but it means we reached it.
+                    // For same-origin, we can check response.ok. This is a compromise for cross-origin checks.
+                    if (response.type === 'opaque' || response.ok) {
+                        return { status: 'OK', statusCode: response.status, url };
+                    } else {
+                        return { status: 'FAIL', statusCode: response.status, url };
+                    }
+                } catch (error) {
+                    // This catches network errors like "Load failed..." or DNS resolution failures
+                    return { status: 'DISCONNECTED', statusCode: null, error: error.message, url };
+                }
+            },
+
+            async runScan() {
+                console.log(`[AGENT] Starting endpoint scan at ${new Date().toLocaleTimeString()}`);
+                const scanPromises = this.config.endpointsToScan.map(this.checkEndpoint);
+                const results = await Promise.all(scanPromises);
+                
+                // Update the virtual file system
+                VFS['/public/agent_status.json'].timestamp = new Date().toISOString();
+                VFS['/public/agent_status.json'].endpoints = results;
+                VFS['/public/agent_status.json'].trust_score = 
+                    results.filter(r => r.status === 'OK').length / results.length;
+                
+                console.log('[AGENT] Scan complete. Updated /public/agent_status.json.');
+                // In a real app, you might POST this to a master server.
+                // fetch('/api/report', { method: 'POST', body: JSON.stringify(VFS['/public/agent_status.json']) });
+            },
+
+            start() {
+                console.log('[AGENT] Adaptive Agent Initialized.');
+                this.runScan(); // Initial scan
+                setInterval(() => this.runScan(), this.config.scanInterval);
+            }
+        };
+
+        // ===================================================================================
+        // MODULE: /webui/system_orchestrator.js
+        // This orchestrator reads the agent's status file and updates the UI.
+        // ===================================================================================
+        const SystemOrchestrator = {
+            dom: {
+                systemStatus: document.getElementById('system-status-text'),
+                orchestratorStatus: document.getElementById('orchestrator-status'),
+                dashboard: document.getElementById('endpoint-dashboard')
+            },
+            pollInterval: 15000, // Polls the VFS faster than the agent scans
+            lastStatus: {},
+
+            pollAgentStatus() {
+                const status = VFS['/public/agent_status.json'];
+                const statusString = JSON.stringify(status);
+
+                // Only re-render if the status has actually changed
+                if (statusString !== this.lastStatus) {
+                    console.log(`[ORCHESTRATOR] Detected change in agent status. Re-rendering UI.`);
+                    this.updateUI(status);
+                    this.lastStatus = statusString;
+                }
+            },
+
+            createTileHTML(endpoint) {
+                let statusClass = '';
+                let statusText = '';
+                let tooltipText = `Endpoint: ${endpoint.url}`;
+
+                switch(endpoint.status) {
+                    case 'OK':
+                        statusClass = 'status-ok';
+                        statusText = `ONLINE (${endpoint.statusCode})`;
+                        break;
+                    case 'FAIL':
+                        statusClass = 'status-fail';
+                        statusText = `FAIL (${endpoint.statusCode})`;
+                        tooltipText = "Endpoint exists but returned an error (e.g., 404, 500).";
+                        showToast(`Endpoint ${new URL(endpoint.url, window.location.href).hostname} is failing!`, 'error');
+                        break;
+                    case 'DISCONNECTED':
+                        statusClass = 'status-disconnected';
+                        statusText = 'DISCONNECTED';
+                        tooltipText = "Could not reach endpoint. Network error or CORS issue.";
+                        showToast(`Endpoint ${new URL(endpoint.url, window.location.href).hostname} is disconnected.`, 'warn');
+                        break;
+                }
+
+                const displayName = new URL(endpoint.url, window.location.href).pathname.replace(/^\/|\/$/g, '') || new URL(endpoint.url, window.location.href).hostname;
+
+                return `
+                    <div class="tile p-4 rounded-lg ${statusClass}">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-md truncate pr-2">${displayName}</h3>
+                            <div class="tooltip">
+                                <span class="font-mono text-xs font-bold">${statusText}</span>
+                                <span class="tooltip-text">${tooltipText}</span>
+                            </div>
+                        </div>
+                        ${endpoint.status !== 'OK' ? `
+                        <div class="mt-2 text-xs font-mono text-gray-400">
+                            <p>Fallback: Active</p>
+                            <p>Displaying mock data.</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            },
+
+            updateUI(status) {
+                // Update system status header
+                const okCount = status.endpoints.filter(e => e.status === 'OK').length;
+                const totalCount = status.endpoints.length;
+                this.dom.systemStatus.textContent = `OPERATIONAL - ${okCount}/${totalCount} ENDPOINTS LIVE`;
+
+                // Update orchestrator tile
+                this.dom.orchestratorStatus.innerHTML = `
+                    <p>Agent ID: <span class="text-secondary">${status.agentId}</span></p>
+                    <p>Last Check: <span class="text-gray-300">${new Date(status.timestamp).toLocaleTimeString()}</span></p>
+                    <p>Trust Score: <span class="text-primary">${status.trust_score.toFixed(3)}</span></p>
+                `;
+
+                // Update endpoint dashboard
+                this.dom.dashboard.innerHTML = status.endpoints.map(this.createTileHTML).join('');
+            },
+
+            start() {
+                console.log('[ORCHESTRATOR] System Orchestrator Initialized.');
+                this.pollAgentStatus(); // Initial poll
+                setInterval(() => this.pollAgentStatus(), this.pollInterval);
+            }
+        };
+
+        // ===================================================================================
+        // MODULE: In-HTML Update Console Logic
+        // ===================================================================================
+        const UpdateConsole = {
+            dom: {
+                commandBox: document.getElementById('commandBox'),
+                pushButton: document.getElementById('pushButton'),
+                status: document.getElementById('console-status'),
+                injectionTarget: document.getElementById('live-injection-target')
+            },
+
+            async sendUpdate() {
+                const cmd = this.dom.commandBox.value;
+                if (!cmd) {
+                    this.updateStatus('Command empty. Ignored.', 'warn');
+                    return;
+                }
+
+                this.updateStatus('Processing...', 'info');
+
+                // 1. Simulate saving to /updates/queue.txt
+                VFS['/updates/queue.txt'] = cmd;
+                console.log(`[CONSOLE] Wrote to /updates/queue.txt: "${cmd.substring(0, 50)}..."`);
+                
+                // 2. Simulate saving to /logs/command_log.json
+                const log = { timestamp: new Date().toISOString(), command: cmd, source: 'UI_CONSOLE' };
+                VFS['/logs/command_log.json'].push(log);
+                console.log('[CONSOLE] Pushed to /logs/command_log.json:', log);
+
+                // 3. Live-inject into DOM (dangerous, for demo only)
+                this.liveInject(cmd);
+
+                this.dom.commandBox.value = '';
+                this.updateStatus('Command pushed to queue & injected.', 'success');
+                showToast('Update command executed.', 'success');
+            },
+
+            liveInject(code) {
+                // Simple detection of code type
+                const trimmedCode = code.trim();
+                if (trimmedCode.startsWith('<style')) {
+                    const style = document.createElement('style');
+                    style.textContent = code;
+                    document.head.appendChild(style);
+                } else if (trimmedCode.startsWith('<')) {
+                    this.dom.injectionTarget.innerHTML += code;
+                } else { // Assume JS
+                    try {
+                        const script = document.createElement('script');
+                        script.textContent = code;
+                        document.body.appendChild(script);
+                    } catch (e) {
+                         this.updateStatus(`JS Injection Failed: ${e.message}`, 'error');
+                         console.error('[CONSOLE] Injection failed:', e);
+                         showToast(`JS Injection Failed: ${e.message}`, 'error');
+                    }
+                }
+            },
+
+            updateStatus(msg, type) {
+                const colorMap = { success: 'text-green-500', warn: 'text-yellow-500', error: 'text-red-500', info: 'text-blue-500' };
+                this.dom.status.textContent = msg;
+                this.dom.status.className = `text-xs text-center ${colorMap[type] || 'text-gray-500'} h-4`;
+                setTimeout(() => this.dom.status.textContent = '', 4000);
+            },
+            
+            init() {
+                this.dom.pushButton.addEventListener('click', () => this.sendUpdate());
+                this.dom.commandBox.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.sendUpdate();
+                    }
+                });
+                console.log('[CONSOLE] Update Console Initialized.');
+            }
+        };
+
+        // ===================================================================================
+        // SYSTEM INITIALIZATION
+        // ===================================================================================
+        AdaptiveAgent.start();
+        SystemOrchestrator.start();
+        UpdateConsole.init();
+    });
+    </script>
+</body>
+</html>
+
