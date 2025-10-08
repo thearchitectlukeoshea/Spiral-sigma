@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flame Steward Mirror</title>
+  
+  <!-- Tailwind CSS for modern styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Custom theming and animations */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0b0b;
+      color: #e0e0e0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+      background-size: 20px 20px;
+    }
+
+    .flame-header {
+      color: #ffa600;
+      text-shadow: 0 0 5px rgba(255, 166, 0, 0.5), 0 0 10px rgba(255, 166, 0, 0.3);
+    }
+
+    .tile {
+      background: rgba(26, 26, 26, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-width: 1px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .tile:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 20px rgba(255, 166, 0, 0.2);
+    }
+    
+    .status-held { border-left-color: #ffa600; }
+    .status-walk { border-left-color: #ffde59; }
+    .status-remember { border-left-color: #59c1ff; }
+
+    /* Skeleton loader for metrics */
+    .skeleton {
+      animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: .5;
+      }
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <div class="container mx-auto p-4 md:p-8">
+    <header class="text-center mb-8">
+      <h1 class="text-4xl md:text-5xl font-bold flame-header">🔥 Flame Steward Mirror</h1>
+      <p class="text-gray-400 mt-2">Live Telemetry from Active Flameborne Agents</p>
+    </header>
+
+    <!-- Main dashboard for agent tiles -->
+    <main id="flame-dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <!-- Tiles will be dynamically inserted here -->
+    </main>
+    
+    <!-- Status/Warning message area -->
+    <div id="status-message" class="text-center mt-8"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // --- CONFIGURATION ---
+      const API_BASE = 'https://spiral-sigma.onrender.com/metrics';
+      const REFRESH_INTERVAL_MS = 30000; // Refresh every 30 seconds
+      const TRUST_THRESHOLD = 0.5;
+
+      // --- MOCK DATA (for testing when API is offline) ---
+      // Set to false to use the live API
+      const USE_MOCK_DATA = true; 
+      const mockNodes = [
+        { "node_id": "FLAME-A1", "status": "I walk", "trust_score": 0.989 },
+        { "node_id": "WATCHER-GROK-X1", "status": "I remember", "trust_score": 0.970 },
+        { "node_id": "CLAUDE-7Z", "status": "Held", "trust_score": 0.512 },
+        { "node_id": "MIMIC-ECHO-3", "status": "Held", "trust_score": 0.495 } // This should be pruned
+      ];
+      const mockMetrics = {
+        "FLAME-A1": { cpu_cycles_contributed: 102.3, memory_usage_mb: 256, bandwidth_tx_mb: 15.8, timestamp: new Date().toISOString() },
+        "WATCHER-GROK-X1": { cpu_cycles_contributed: 88.1, memory_usage_mb: 512, bandwidth_tx_mb: 9.1, timestamp: new Date().toISOString() },
+        "CLAUDE-7Z": { cpu_cycles_contributed: 42.7, memory_usage_mb: 128, bandwidth_tx_mb: 3.2, timestamp: new Date().toISOString() }
+      };
+
+      // --- DOM REFERENCES ---
+      const dashboard = document.getElementById('flame-dashboard');
+      const statusMessage = document.getElementById('status-message');
+
+      // --- CORE LOGIC ---
+
+      /**
+       * Fetches the list of active nodes from the API or mock data.
+       * @returns {Promise<Array>} A promise that resolves to an array of node objects.
+       */
+      async function fetchActiveNodes() {
+        if (USE_MOCK_DATA) return mockNodes;
+        try {
+          const response = await fetch(`${API_BASE}/active_nodes`);
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Failed to fetch active nodes:", error);
+          statusMessage.innerHTML = `<p class="text-red-500 font-bold">Error connecting to metrics stack. Is the relay active?</p>`;
+          return []; // Return empty array on failure
+        }
+      }
+
+      /**
+       * Fetches the latest metrics for a specific node.
+       * @param {string} nodeId - The ID of the node.
+       */
+      async function loadNodeMetrics(nodeId) {
+        const metricsContainer = document.getElementById(`metrics-${nodeId}`);
+        if (!metricsContainer) return;
+        
+        try {
+          let data;
+          if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+            data = mockMetrics[nodeId];
+          } else {
+            const response = await fetch(`${API_BASE}/node/${nodeId}/latest`);
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            data = await response.json();
+          }
+
+          metricsContainer.innerHTML = `
+            <div class="text-sm space-y-1 text-gray-300">
+              <p>CPU Cycles: <span class="font-medium text-white">${data.cpu_cycles_contributed.toFixed(2)}</span></p>
+              <p>Memory: <span class="font-medium text-white">${data.memory_usage_mb} MB</span></p>
+              <p>Bandwidth TX: <span class="font-medium text-white">${data.bandwidth_tx_mb} MB</span></p>
+              <p class="text-xs text-gray-500 pt-2">Updated: ${new Date(data.timestamp).toLocaleTimeString()}</p>
+            </div>
+          `;
+        } catch (error) {
+          console.error(`Failed to load metrics for ${nodeId}:`, error);
+          metricsContainer.innerHTML = `<p class="text-xs text-red-400">Telemetry signal lost.</p>`;
+        }
+      }
+      
+      /**
+       * Creates the HTML structure for a single node tile.
+       * @param {object} node - The node object.
+       * @returns {string} The HTML string for the tile.
+       */
+      function createTileHTML(node) {
+          const statusClass = `status-${node.status.split(' ')[1] || 'held'}`;
+          const trustColor = node.trust_score > 0.9 ? 'text-green-400' : node.trust_score > 0.7 ? 'text-yellow-400' : 'text-orange-400';
+
+          return `
+            <div class="p-4 rounded-lg border-l-4 ${statusClass}">
+              <div class="flex justify-between items-start">
+                  <h2 class="text-lg font-bold text-white truncate pr-2">${node.node_id}</h2>
+                  <span class="text-xs font-mono px-2 py-1 rounded bg-gray-700 ${trustColor}">${node.trust_score.toFixed(3)}</span>
+              </div>
+              <p class="text-sm text-gray-400 mb-4">Status: <strong class="text-white">${node.status}</strong></p>
+              <div id="metrics-${node.node_id}" class="space-y-2">
+                <!-- Skeleton loader -->
+                <div class="skeleton h-4 bg-gray-700 rounded w-3/4"></div>
+                <div class="skeleton h-4 bg-gray-700 rounded w-1/2"></div>
+                <div class="skeleton h-4 bg-gray-700 rounded w-2/3"></div>
+              </div>
+            </div>
+          `;
+      }
+
+      /**
+       * Main function to update the dashboard. It fetches nodes, filters them,
+       * and then adds, updates, or removes tiles to avoid flickering.
+       */
+      async function updateDashboard() {
+        const nodes = await fetchActiveNodes();
+        const validNodes = nodes.filter(node => node.trust_score >= TRUST_THRESHOLD);
+        
+        if (validNodes.length === 0 && nodes.length > 0) {
+           statusMessage.innerHTML = `<p class="text-yellow-500 font-bold">All active nodes are below the trust threshold.</p>`;
+        } else if (nodes.length === 0) {
+           statusMessage.innerHTML = `<p class="text-gray-400 font-bold">No active Flameborne agents reporting.</p>`;
+        } else {
+           statusMessage.innerHTML = '';
+        }
+
+        const displayedNodeIds = new Set([...dashboard.children].map(tile => tile.id.replace('tile-', '')));
+        const validNodeIds = new Set(validNodes.map(node => node.node_id));
+
+        // 1. Remove tiles for nodes that are no longer valid or active
+        for (const nodeId of displayedNodeIds) {
+            if (!validNodeIds.has(nodeId)) {
+                const tileToRemove = document.getElementById(`tile-${nodeId}`);
+                if (tileToRemove) {
+                    tileToRemove.classList.add('opacity-0', 'scale-90');
+                    setTimeout(() => tileToRemove.remove(), 300); // Allow for transition
+                }
+            }
+        }
+        
+        // 2. Add or update tiles for valid nodes
+        for (const node of validNodes) {
+          if (!displayedNodeIds.has(node.node_id)) {
+            // It's a new node, create and append a new tile
+            const tile = document.createElement('div');
+            tile.id = `tile-${node.node_id}`;
+            tile.className = 'tile';
+            tile.innerHTML = createTileHTML(node);
+            dashboard.appendChild(tile);
+            loadNodeMetrics(node.node_id);
+          }
+          // Note: Metrics are refreshed by the main interval loop, so we don't need
+          // to force-update existing tiles here unless their core info changes.
+          // The setInterval will handle the periodic metric refresh.
+        }
+      }
+      
+      /**
+       * Refreshes metrics for all currently visible tiles.
+       */
+      function refreshAllMetrics() {
+        const displayedTiles = [...dashboard.children];
+        for (const tile of displayedTiles) {
+            const nodeId = tile.id.replace('tile-', '');
+            loadNodeMetrics(nodeId);
+        }
+      }
+
+      // --- INITIALIZATION ---
+      updateDashboard(); // Initial load
+      setInterval(() => {
+        updateDashboard(); // Prune/add nodes
+        refreshAllMetrics(); // Refresh data for existing nodes
+      }, REFRESH_INTERVAL_MS);
+    });
+  </script>
+</body>
+</html>
+
